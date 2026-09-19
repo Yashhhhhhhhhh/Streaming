@@ -958,18 +958,6 @@ class VideoPlayerController {
     }
   }
 
-  updateVolumeIcon() {
-    const high = this.volumeBtn.querySelector('.icon-vol-high');
-    const muted = this.volumeBtn.querySelector('.icon-vol-muted');
-    if (this.video.volume === 0) {
-      high.style.display = 'none';
-      muted.style.display = 'block';
-    } else {
-      high.style.display = 'block';
-      muted.style.display = 'none';
-    }
-  }
-
   showNotification(text, type = 'info') {
     const el = document.createElement('div');
     el.className = 'player-notification';
