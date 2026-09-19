@@ -60,21 +60,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ============ PERMANENT COUPLE CINEMA AUTO-CONNECT ============
   const urlParams = new URLSearchParams(window.location.search);
-  const requestedRoom = (urlParams.get('room') || 'cinema').toLowerCase().trim();
   const savedAvatar = localStorage.getItem('syncwatch-avatar') || 'scout';
   const manualLeave = sessionStorage.getItem('syncwatch-manual-leave');
 
   // Drag and drop
   initDragDrop();
 
-  if (savedName && !manualLeave) {
-    // Both user & partner are auto-connected into the cinema room with 0 clicks!
-    connectToRoom(requestedRoom, savedName, savedAvatar);
-  } else if (!savedName) {
-    // First-time visitor (e.g. your girlfriend opening the bookmark on her laptop):
-    // Prompt her once for callsign so she can pick her name and insignia
-    document.getElementById('join-code').value = requestedRoom;
-    showJoinModal();
+  if (urlParams.has('room')) {
+    const requestedRoom = urlParams.get('room').toLowerCase().trim();
+    if (requestedRoom) {
+      if (savedName && !manualLeave) {
+        // Auto-connect when accessing direct room link or bookmark
+        connectToRoom(requestedRoom, savedName, savedAvatar);
+      } else if (!savedName) {
+        // First-time visitor opening the bookmark: prompt once for callsign
+        document.getElementById('join-code').value = requestedRoom;
+        showJoinModal();
+      }
+    }
   }
 });
 
@@ -198,9 +201,13 @@ function connectToRoom(roomId, userName, avatar) {
     // Load current media
     if (state.currentMedia) {
       player.loadMedia(state.currentMedia);
-      // Sync to current position
-      setTimeout(() => {
-        player.video.currentTime = state.currentTime;
+      // Sync to current position as soon as metadata is ready
+      const applyState = () => {
+        if (typeof state.currentTime === 'number' && !isNaN(state.currentTime)) {
+          try {
+            player.video.currentTime = state.currentTime;
+          } catch (e) {}
+        }
         if (state.isPlaying) {
           const p = player.video.play();
           if (p !== undefined) {
@@ -212,7 +219,18 @@ function connectToRoom(roomId, userName, avatar) {
         if (state.playbackRate) {
           player.syncPlaybackRate(state.playbackRate);
         }
-      }, 500);
+      };
+
+      if (player.video.readyState >= 1) {
+        applyState();
+      } else {
+        player.video.addEventListener('loadedmetadata', applyState, { once: true });
+        setTimeout(() => {
+          if (player.video.paused && state.isPlaying) {
+            applyState();
+          }
+        }, 1200);
+      }
     }
 
     // Load chat history
@@ -542,21 +560,30 @@ async function handleFileUpload(input) {
     xhr.onload = () => {
       overlay.classList.remove('active');
       if (xhr.status === 200) {
-        const data = JSON.parse(xhr.responseText);
-        showToast(`Uploaded: ${file.name}`, 'success');
-        // Auto-play if first media
-        if (data.media) {
-          selectMedia(data.media.id);
+        try {
+          const data = JSON.parse(xhr.responseText);
+          showToast(`Uploaded: ${file.name}`, 'success');
+          // Auto-play if first media
+          if (data.media) {
+            selectMedia(data.media.id);
+          }
+        } catch (e) {
+          showToast(`Uploaded: ${file.name}`, 'success');
         }
       } else {
-        showToast('Upload failed', 'error');
+        let errorMsg = 'Upload failed';
+        try {
+          const errData = JSON.parse(xhr.responseText);
+          if (errData.error) errorMsg = errData.error;
+        } catch (e) {}
+        showToast(errorMsg, 'error');
       }
       input.value = '';
     };
 
     xhr.onerror = () => {
       overlay.classList.remove('active');
-      showToast('Upload failed', 'error');
+      showToast('Network error during upload', 'error');
       input.value = '';
     };
 
@@ -617,7 +644,10 @@ function initDragDrop() {
     dragCounter = 0;
     document.body.classList.remove('drop-zone-active');
 
-    if (!window.currentRoom) return;
+    if (!window.currentRoom) {
+      showToast('Enter Cinema or a room before loading video files', 'info');
+      return;
+    }
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
@@ -750,9 +780,13 @@ function formatFileSize(bytes) {
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 // ============ GEMINI AI COMPANION (/gemini-live-api-dev) ============

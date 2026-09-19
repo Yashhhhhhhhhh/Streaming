@@ -302,8 +302,9 @@ class VideoPlayerController {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (!document.getElementById('room-page').classList.contains('active')) return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (!document.getElementById('room-page')?.classList.contains('active')) return;
 
       switch (e.key) {
         case ' ':
@@ -425,7 +426,12 @@ class VideoPlayerController {
   }
 
   loadLocalMedia(file) {
+    if (this.currentMediaBlobUrl) {
+      URL.revokeObjectURL(this.currentMediaBlobUrl);
+      this.currentMediaBlobUrl = null;
+    }
     const objectUrl = URL.createObjectURL(file);
+    this.currentMediaBlobUrl = objectUrl;
     this.video.src = objectUrl;
     this.video.load();
     this.video.classList.add('visible');
@@ -660,6 +666,32 @@ class VideoPlayerController {
       modeBadge.textContent = 'Ready';
       modeBadge.className = 'mode-badge';
     }
+    if (this.progressBar) this.progressBar.style.width = '0%';
+    if (this.progressBuffer) this.progressBuffer.style.width = '0%';
+    if (this.currentTimeEl) this.currentTimeEl.textContent = '0:00';
+    if (this.durationEl) this.durationEl.textContent = '0:00';
+
+    // Subtitles cleanup
+    this.subtitleOffset = 0;
+    const subOffsetEl = document.getElementById('popover-sub-offset');
+    if (subOffsetEl) subOffsetEl.textContent = '0.0s';
+    const subStatusEl = document.getElementById('popover-sub-status');
+    if (subStatusEl) subStatusEl.textContent = 'No subtitles active';
+    this.video.querySelectorAll('track').forEach(t => {
+      try { if (t.track) t.track.mode = 'disabled'; } catch (e) {}
+      t.remove();
+    });
+
+    // Revoke blob URLs
+    if (this.currentMediaBlobUrl) {
+      URL.revokeObjectURL(this.currentMediaBlobUrl);
+      this.currentMediaBlobUrl = null;
+    }
+    if (this.currentSubtitleBlobUrl) {
+      URL.revokeObjectURL(this.currentSubtitleBlobUrl);
+      this.currentSubtitleBlobUrl = null;
+    }
+
     this.updatePlayButton();
   }
 
@@ -698,8 +730,19 @@ class VideoPlayerController {
 
   // ---- SUBTITLES & POPOVER ----
   loadSubtitles(pathOrBlobUrl, filename = 'Subtitles loaded') {
+    if (this.currentSubtitleBlobUrl && this.currentSubtitleBlobUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(this.currentSubtitleBlobUrl);
+      this.currentSubtitleBlobUrl = null;
+    }
+    if (typeof pathOrBlobUrl === 'string' && pathOrBlobUrl.startsWith('blob:')) {
+      this.currentSubtitleBlobUrl = pathOrBlobUrl;
+    }
+
     const existing = this.video.querySelectorAll('track');
-    existing.forEach(t => t.remove());
+    existing.forEach(t => {
+      try { if (t.track) t.track.mode = 'disabled'; } catch (e) {}
+      t.remove();
+    });
 
     const track = document.createElement('track');
     track.kind = 'subtitles';
@@ -799,6 +842,7 @@ class VideoPlayerController {
 
   // ---- SYNC PROTOCOL METHODS ----
   syncPlay(time) {
+    if (!this.video.src) return;
     this.syncLock = true;
     if (Math.abs(this.video.currentTime - time) > 0.3) {
       this.video.currentTime = time;
@@ -813,6 +857,7 @@ class VideoPlayerController {
   }
 
   syncPause(time) {
+    if (!this.video.src) return;
     this.syncLock = true;
     if (Math.abs(this.video.currentTime - time) > 0.3) {
       this.video.currentTime = time;
@@ -822,6 +867,7 @@ class VideoPlayerController {
   }
 
   syncSeek(time) {
+    if (!this.video.src) return;
     this.syncLock = true;
     this.video.currentTime = time;
     setTimeout(() => this.syncLock = false, 500);
@@ -840,7 +886,7 @@ class VideoPlayerController {
 
   // Gentle drift correction from host heartbeat
   handleSyncHeartbeat({ time, isPlaying, rate }) {
-    if (this.syncLock) return;
+    if (!this.video.src || this.syncLock) return;
     if (isPlaying && this.video.paused) {
       this.syncPlay(time);
       return;
@@ -966,9 +1012,13 @@ class VideoPlayerController {
   }
 
   escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 

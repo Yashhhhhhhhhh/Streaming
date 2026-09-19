@@ -21,12 +21,15 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 // Multer storage config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const roomDir = path.join(uploadsDir, req.params.roomId || 'default');
+    const safeRoom = path.basename(req.params.roomId || 'default');
+    const roomDir = path.join(uploadsDir, safeRoom);
     if (!fs.existsSync(roomDir)) fs.mkdirSync(roomDir, { recursive: true });
     cb(null, roomDir);
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
+    // Sanitize originalname removing illegal Windows filename characters: \ / : * ? " < > |
+    const safeOriginalName = path.basename(file.originalname).replace(/[/\\?%*:|"<>]/g, '_');
+    const uniqueName = `${Date.now()}-${safeOriginalName}`;
     cb(null, uniqueName);
   }
 });
@@ -209,8 +212,10 @@ app.post('/api/gemini/ask', (req, res) => {
 
 // Stream media with range support for seeking and tunnel chunk optimization
 app.get('/api/stream/:roomId/:filename', (req, res) => {
-  const filePath = path.join(uploadsDir, req.params.roomId, req.params.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
+  const safeRoomId = path.basename(req.params.roomId);
+  const safeFilename = path.basename(req.params.filename);
+  const filePath = path.join(uploadsDir, safeRoomId, safeFilename);
+  if (!filePath.startsWith(uploadsDir) || !fs.existsSync(filePath)) return res.status(404).send('File not found');
 
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;

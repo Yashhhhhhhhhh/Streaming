@@ -120,15 +120,19 @@ class ChatController {
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     // Italic
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    // Links
-    text = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--accent-primary)">$1</a>');
+    // Links (strict URL pattern without quotes or brackets)
+    text = text.replace(/(https?:\/\/[^\s"'<>]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--accent-primary)">$1</a>');
     return text;
   }
 
   escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }
 
