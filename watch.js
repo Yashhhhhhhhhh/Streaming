@@ -128,14 +128,23 @@ waitForLocalServer(() => {
   function shutdown() {
     console.log('\n🛑 Shutting down server and tunnel cleanly...');
     try {
-      tunnelProcess.kill('SIGINT');
+      if (process.platform === 'win32' && tunnelProcess.pid) {
+        execSync(`taskkill /pid ${tunnelProcess.pid} /T /F`, { stdio: 'ignore' });
+      } else {
+        tunnelProcess.kill('SIGKILL');
+      }
     } catch (e) {}
     try {
-      serverProcess.kill('SIGINT');
+      if (process.platform === 'win32' && serverProcess.pid) {
+        execSync(`taskkill /pid ${serverProcess.pid} /T /F`, { stdio: 'ignore' });
+      } else {
+        serverProcess.kill('SIGKILL');
+      }
     } catch (e) {}
-    setTimeout(() => process.exit(0), 1000);
+    setTimeout(() => process.exit(0), 400);
   }
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  process.on('exit', shutdown);
 });

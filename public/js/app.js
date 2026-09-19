@@ -170,6 +170,9 @@ function connectToRoom(roomId, userName, avatar) {
       player.loadSubtitles(state.subtitles);
     }
 
+    // Room host flag
+    window.isHost = state.isHost;
+
     // Switch to room page
     showPage('room-page');
     showToast(`Welcome to room ${state.roomId.toUpperCase()}!`, 'success');
@@ -197,6 +200,13 @@ function connectToRoom(roomId, userName, avatar) {
     player.showNotification(`${by} changed speed to ${rate}x`);
   });
 
+  // Continuous heartbeat for smooth drift-free synchronization
+  window.socket.on('sync-heartbeat', (data) => {
+    if (!window.isHost) {
+      player.handleSyncHeartbeat(data);
+    }
+  });
+
   // Media changed
   window.socket.on('media-changed', ({ media }) => {
     player.loadMedia(media);
@@ -218,6 +228,7 @@ function connectToRoom(roomId, userName, avatar) {
   // ---- CHAT EVENTS ----
   window.socket.on('chat-message', (msg) => {
     chat.addMessage(msg);
+    player.showFullscreenChatMessage(msg);
   });
 
   window.socket.on('user-typing', ({ userName }) => {
@@ -529,9 +540,18 @@ function initDragDrop() {
 
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      const fileInput = document.getElementById('file-upload-input');
-      fileInput.files = files;
-      handleFileUpload(fileInput);
+      const file = files[0];
+      const lower = file.name.toLowerCase();
+      // Intelligent drop detection: if subtitle dropped, load as subtitles
+      if (lower.endsWith('.srt') || lower.endsWith('.vtt') || lower.endsWith('.ass') || lower.endsWith('.ssa')) {
+        if (player) {
+          player.loadLocalSubtitleFile(file);
+        }
+      } else {
+        const fileInput = document.getElementById('file-upload-input');
+        fileInput.files = files;
+        handleFileUpload(fileInput);
+      }
     }
   });
 }
@@ -611,6 +631,83 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ============ GEMINI AI COMPANION (/gemini-live-api-dev) ============
+async function askGeminiCompanion() {
+  const input = document.getElementById('gemini-input');
+  const prompt = input?.value.trim();
+  if (!prompt) return;
+
+  const msgList = document.getElementById('gemini-messages');
+  if (!msgList) return;
+
+  // Render user prompt
+  const userEl = document.createElement('div');
+  userEl.className = 'gemini-msg user';
+  userEl.innerHTML = `<div class="gemini-bubble user">${escapeHtml(prompt)}</div>`;
+  msgList.appendChild(userEl);
+  input.value = '';
+  msgList.scrollTop = msgList.scrollHeight;
+
+  // Render thinking bubble
+  const aiEl = document.createElement('div');
+  aiEl.className = 'gemini-msg ai';
+  aiEl.innerHTML = `<div class="gemini-bubble ai thinking">Thinking... 🎬</div>`;
+  msgList.appendChild(aiEl);
+  msgList.scrollTop = msgList.scrollHeight;
+
+  const apiKey = localStorage.getItem('gemini-api-key') || '';
+  const currentTitle = document.getElementById('np-title')?.textContent || '';
+
+  try {
+    const res = await fetch('/api/gemini/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, mediaTitle: currentTitle, apiKey })
+    });
+    const data = await res.json();
+    if (data.answer) {
+      aiEl.querySelector('.gemini-bubble').innerHTML = formatMarkdown(data.answer);
+      aiEl.querySelector('.gemini-bubble').classList.remove('thinking');
+    } else {
+      aiEl.querySelector('.gemini-bubble').innerHTML = `<span style="color:var(--danger)">${escapeHtml(data.error || 'Failed to get response')}</span>`;
+      aiEl.querySelector('.gemini-bubble').classList.remove('thinking');
+      if (data.error && data.error.includes('API key')) {
+        showGeminiKeyModal();
+      }
+    }
+  } catch (err) {
+    aiEl.querySelector('.gemini-bubble').innerHTML = `<span style="color:var(--danger)">Connection error</span>`;
+    aiEl.querySelector('.gemini-bubble').classList.remove('thinking');
+  }
+  msgList.scrollTop = msgList.scrollHeight;
+}
+
+function showGeminiKeyModal() {
+  document.getElementById('gemini-key-modal')?.classList.add('active');
+}
+
+function saveGeminiApiKey() {
+  const keyInput = document.getElementById('gemini-api-key-input');
+  if (keyInput) {
+    const val = keyInput.value.trim();
+    if (val) {
+      localStorage.setItem('gemini-api-key', val);
+      showToast('Gemini API key saved! 🤖', 'success');
+      keyInput.value = '';
+      closeModal(document.getElementById('gemini-key-modal'));
+    }
+  }
+}
+
+function formatMarkdown(text) {
+  text = escapeHtml(text);
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+  text = text.replace(/\n/g, '<br>');
+  return text;
 }
 
 // ============ PREVENT ACCIDENTAL NAVIGATION ============

@@ -35,14 +35,14 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 * 1024 }, // 10GB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /video|audio|subtitle/;
+    const ext = path.extname(file.originalname).toLowerCase();
     const mimeType = mime.lookup(file.originalname) || '';
-    if (mimeType.startsWith('video/') || mimeType.startsWith('audio/') ||
-        file.originalname.endsWith('.srt') || file.originalname.endsWith('.vtt') ||
-        file.originalname.endsWith('.ass') || file.originalname.endsWith('.ssa')) {
+    const allowedExtensions = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.ts', '.m4v', '.m2ts', '.wmv', '.ogv', '.srt', '.vtt', '.ass', '.ssa', '.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg'];
+    
+    if (mimeType.startsWith('video/') || mimeType.startsWith('audio/') || allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error('Only video, audio, and subtitle files are allowed'), false);
+      cb(new Error(`File type not supported: ${ext}. Supported: video, audio, and subtitles`), false);
     }
   }
 });
@@ -135,6 +135,67 @@ app.get('/api/ping', (req, res) => {
   res.json({ pong: Date.now() });
 });
 
+// Gemini AI Companion endpoint (/gemini-live-api-dev)
+const https = require('https');
+app.post('/api/gemini/ask', (req, res) => {
+  const { prompt, mediaTitle, apiKey: userKey } = req.body;
+  const apiKey = userKey || process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return res.status(400).json({ error: 'Gemini API key required. Enter your API key in the AI Companion panel.' });
+  }
+
+  const systemInstruction = "You are SyncWatch AI, an engaging, knowledgeable, and spoiler-free movie & anime watch companion. You answer questions about characters, lore, plot context, Japanese anime idioms/culture, and cinematic trivia while viewers watch together. Keep answers conversational, helpful, and concise.";
+
+  const postData = JSON.stringify({
+    contents: [
+      {
+        parts: [
+          { text: `[Context: Watching "${mediaTitle || 'Anime / Movie'}"]\n\nQuestion: ${prompt}` }
+        ]
+      }
+    ],
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    }
+  });
+
+  const options = {
+    hostname: 'generativelanguage.googleapis.com',
+    port: 443,
+    path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData)
+    }
+  };
+
+  const gReq = https.request(options, (gRes) => {
+    let body = '';
+    gRes.on('data', (d) => body += d);
+    gRes.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+          res.json({ answer: data.candidates[0].content.parts[0].text });
+        } else {
+          res.status(500).json({ error: data.error?.message || 'Failed to retrieve response from Gemini' });
+        }
+      } catch (e) {
+        res.status(500).json({ error: 'Error parsing Gemini response' });
+      }
+    });
+  });
+
+  gReq.on('error', (e) => {
+    res.status(500).json({ error: 'Connection error to Gemini API: ' + e.message });
+  });
+
+  gReq.write(postData);
+  gReq.end();
+});
+
 // Stream media with range support for seeking and tunnel chunk optimization
 app.get('/api/stream/:roomId/:filename', (req, res) => {
   const filePath = path.join(uploadsDir, req.params.roomId, req.params.filename);
@@ -145,13 +206,15 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
   const mimeType = mime.lookup(filePath) || 'video/mp4';
 
   // Handle subtitle files
-  if (filePath.endsWith('.vtt') || filePath.endsWith('.srt')) {
-    res.setHeader('Content-Type', 'text/vtt');
+  const lowerPath = filePath.toLowerCase();
+  if (lowerPath.endsWith('.vtt') || lowerPath.endsWith('.srt') || lowerPath.endsWith('.ass') || lowerPath.endsWith('.ssa')) {
+    res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     
-    if (filePath.endsWith('.srt')) {
-      // Convert SRT to VTT on the fly
-      const srtContent = fs.readFileSync(filePath, 'utf-8');
+    if (lowerPath.endsWith('.srt')) {
+      // Convert SRT to VTT on the fly, strip UTF-8 BOM
+      let srtContent = fs.readFileSync(filePath, 'utf-8');
+      srtContent = srtContent.replace(/^\uFEFF/, '');
       const vttContent = 'WEBVTT\n\n' + srtContent
         .replace(/\r\n/g, '\n')
         .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
@@ -298,6 +361,21 @@ io.on('connection', (socket) => {
       by: socket.userName,
       filename,
       size
+    });
+  });
+
+  // Continuous sync heartbeat (prevents drift over remote networks)
+  socket.on('sync-heartbeat', ({ time, isPlaying, rate }) => {
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    room.currentTime = time;
+    room.isPlaying = isPlaying;
+    room.playbackRate = rate;
+    socket.to(socket.roomId).emit('sync-heartbeat', {
+      time,
+      isPlaying,
+      rate,
+      from: socket.userName
     });
   });
 

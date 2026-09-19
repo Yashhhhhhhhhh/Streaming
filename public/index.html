@@ -249,12 +249,15 @@
                   </div>
 
                   <div class="controls-right">
+                    <button class="ctrl-btn" id="boost-btn" onclick="cycleAudioBoost()" title="Audio Booster (Press B)">🔊 100%</button>
                     <div class="speed-control">
                       <button class="ctrl-btn" id="speed-btn" onclick="cycleSpeed()" title="Playback speed">1x</button>
                     </div>
-                    <button class="ctrl-btn" id="subtitles-btn" onclick="toggleSubtitlesPanel()" title="Subtitles">
+                    <button class="ctrl-btn" id="subtitles-btn" onclick="toggleSubtitlesPanel()" title="Upload Subtitles">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="5" y1="12" x2="11" y2="12"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="5" y1="16" x2="15" y2="16"/></svg>
                     </button>
+                    <button class="ctrl-btn" onclick="player?.adjustSubtitleDelay(-0.5)" title="Subtitles -0.5s (Press [)">[-0.5s]</button>
+                    <button class="ctrl-btn" onclick="player?.adjustSubtitleDelay(0.5)" title="Subtitles +0.5s (Press ])">[+0.5s]</button>
                     <button class="ctrl-btn" onclick="togglePiP()" title="Picture-in-Picture">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="1" width="22" height="16" rx="2"/><rect x="11" y="8" width="11" height="8" rx="1" fill="currentColor" opacity="0.3"/></svg>
                     </button>
@@ -312,6 +315,10 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
               Chat
             </button>
+            <button class="sidebar-tab" data-tab="ai" onclick="switchSidebarTab('ai')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2v-2h2zm0-4h-2V7h2z"/></svg>
+              AI Companion
+            </button>
             <button class="sidebar-tab" data-tab="playlist" onclick="switchSidebarTab('playlist')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
               Playlist
@@ -342,6 +349,27 @@
                 </button>
               </div>
             </div>
+          <!-- AI Companion panel (/gemini-live-api-dev) -->
+          <div class="sidebar-panel" id="panel-ai">
+            <div class="ai-header">
+              <span class="ai-title">✨ Gemini AI Companion</span>
+              <button class="btn-xs" onclick="showGeminiKeyModal()" title="Set Gemini API Key">🔑 Key</button>
+            </div>
+            <div class="gemini-messages" id="gemini-messages">
+              <div class="gemini-msg ai">
+                <div class="gemini-bubble ai">
+                  👋 Hi! I'm your movie & anime AI companion powered by Gemini. Ask me about lore, character recaps, Japanese culture, or plot explanations without spoilers!
+                </div>
+              </div>
+            </div>
+            <div class="gemini-input-area">
+              <div class="chat-input-wrapper">
+                <input type="text" id="gemini-input" placeholder="Ask Gemini about this scene..." autocomplete="off" onkeydown="if(event.key==='Enter') askGeminiCompanion()">
+                <button class="send-btn" onclick="askGeminiCompanion()" title="Ask">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Playlist panel -->
@@ -366,9 +394,9 @@
       </main>
     </div>
 
-    <!-- Hidden file inputs -->
-    <input type="file" id="file-upload-input" accept="video/*,audio/*" style="display:none" onchange="handleFileUpload(this)">
-    <input type="file" id="local-file-input" accept="video/*,audio/*" style="display:none" onchange="handleLocalFileSelect(this)">
+    <!-- Hidden file inputs (explicit extensions for complete Windows support) -->
+    <input type="file" id="file-upload-input" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.mov,.flv,.ts,.m4v,.m2ts,.wmv,.ogv" style="display:none" onchange="handleFileUpload(this)">
+    <input type="file" id="local-file-input" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.mov,.flv,.ts,.m4v,.m2ts,.wmv,.ogv" style="display:none" onchange="handleLocalFileSelect(this)">
     <input type="file" id="subtitle-upload-input" accept=".srt,.vtt,.ass,.ssa" style="display:none" onchange="handleSubtitleUpload(this)">
 
     <!-- Upload progress overlay -->
@@ -381,6 +409,22 @@
           <div class="upload-progress-fill" id="upload-progress-fill"></div>
         </div>
         <div class="upload-percent" id="upload-percent">0%</div>
+      </div>
+    </div>
+
+    <!-- Gemini Key Modal -->
+    <div id="gemini-key-modal" class="modal-overlay" onclick="closeModal(this)">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">&times;</button>
+        <h2>Gemini AI Key</h2>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.2rem;line-height:1.5;">
+          Enter your Google Gemini API key to activate the live movie & anime AI companion. (Your key is stored safely in your browser).
+        </p>
+        <div class="form-group">
+          <label for="gemini-api-key-input">Google AI API Key</label>
+          <input type="text" id="gemini-api-key-input" placeholder="AIzaSy..." autocomplete="off">
+        </div>
+        <button class="btn-primary" onclick="saveGeminiApiKey()">Save Key</button>
       </div>
     </div>
   </div>

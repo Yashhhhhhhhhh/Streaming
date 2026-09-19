@@ -1,4 +1,4 @@
-// ============ VIDEO PLAYER CONTROLLER ============
+// ============ VIDEO PLAYER CONTROLLER (HARDENED & FEATURE-RICH) ============
 class VideoPlayerController {
   constructor() {
     this.video = document.getElementById('video-player');
@@ -27,69 +27,114 @@ class VideoPlayerController {
     this.hideControlsTimer = null;
     this.currentSpeed = 1;
     this.speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
-    this.lastVolume = 1;
+    this.lastVolume = parseFloat(localStorage.getItem('syncwatch-volume') || '1');
     this.keyHintTimer = null;
+    this.wakeLock = null;
+
+    // Audio booster via Web Audio API (for laptop speakers)
+    this.audioContext = null;
+    this.gainNode = null;
+    this.audioBoostLevel = 1.0; // 1.0 = normal, 1.5 = boost, 2.0 = super boost
+
+    // Subtitles
+    this.subtitleTrack = null;
+    this.subtitleOffset = 0; // In seconds
+    this.rawCues = [];
+
+    // Fullscreen chat overlay container
+    this.initFullscreenChatOverlay();
+
+    // Heartbeat timer for host
+    this.heartbeatTimer = null;
 
     this.initEvents();
+    this.setVolume(this.lastVolume);
+  }
+
+  initFullscreenChatOverlay() {
+    let overlay = document.getElementById('fullscreen-chat-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'fullscreen-chat-overlay';
+      overlay.className = 'fullscreen-chat-overlay';
+      this.wrapper.appendChild(overlay);
+    }
+    this.fullscreenChatOverlay = overlay;
   }
 
   initEvents() {
-    // Video events
+    // Video metadata
     this.video.addEventListener('loadedmetadata', () => {
       this.durationEl.textContent = this.formatTime(this.video.duration);
       this.controls.classList.add('visible');
       this.centerPlayBtn.classList.add('show');
     });
 
+    // Time update & drift synchronization
     this.video.addEventListener('timeupdate', () => {
       if (!this.isSeeking) {
-        const pct = (this.video.currentTime / this.video.duration) * 100;
+        const pct = (this.video.currentTime / (this.video.duration || 1)) * 100;
         this.progressBar.style.width = pct + '%';
         this.currentTimeEl.textContent = this.formatTime(this.video.currentTime);
 
-        // Send time update to server (throttled)
-        if (window.socket && !this.syncLock) {
-          if (!this._lastTimeUpdate || Date.now() - this._lastTimeUpdate > 2000) {
-            window.socket.emit('time-update', { time: this.video.currentTime });
-            this._lastTimeUpdate = Date.now();
+        // Host emits periodic sync heartbeat to keep all viewers in sync
+        if (window.isHost && this.isPlaying && window.socket && !this.syncLock) {
+          if (!this._lastHeartbeat || Date.now() - this._lastHeartbeat > 2500) {
+            window.socket.emit('sync-heartbeat', {
+              time: this.video.currentTime,
+              isPlaying: this.isPlaying,
+              rate: this.currentSpeed
+            });
+            this._lastHeartbeat = Date.now();
           }
         }
       }
     });
 
+    // Buffering progress
     this.video.addEventListener('progress', () => {
       if (this.video.buffered.length > 0) {
         const buffered = this.video.buffered.end(this.video.buffered.length - 1);
-        const pct = (buffered / this.video.duration) * 100;
+        const pct = (buffered / (this.video.duration || 1)) * 100;
         this.progressBuffer.style.width = pct + '%';
       }
     });
 
+    // Play event
     this.video.addEventListener('play', () => {
       this.isPlaying = true;
       this.updatePlayButton();
       this.centerPlayBtn.classList.remove('show');
+      this.requestWakeLock();
     });
 
+    // Pause event
     this.video.addEventListener('pause', () => {
       this.isPlaying = false;
       this.updatePlayButton();
       this.centerPlayBtn.classList.add('show');
+      this.releaseWakeLock();
     });
 
     this.video.addEventListener('ended', () => {
       this.isPlaying = false;
       this.updatePlayButton();
       this.centerPlayBtn.classList.add('show');
-      this.showNotification('Video ended');
+      this.releaseWakeLock();
+      this.showNotification('Video finished');
     });
 
     this.video.addEventListener('waiting', () => {
-      this.showNotification('Buffering...');
+      this.showNotification('Buffering...', 'info');
     });
 
     this.video.addEventListener('error', () => {
-      this.showNotification('Error loading video', 'error');
+      const err = this.video.error;
+      let msg = 'Error decoding video format';
+      if (err?.code === 4) {
+        msg = 'Video codec not natively supported by browser. Try converting to MP4/H.264 or use Dual-Local mode.';
+      }
+      this.showNotification(msg, 'error');
     });
 
     // Progress bar interactions
@@ -103,14 +148,14 @@ class VideoPlayerController {
     this.progressContainer.addEventListener('mousemove', (e) => {
       const rect = this.progressContainer.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
-      const time = pct * this.video.duration;
+      const time = pct * (this.video.duration || 0);
       this.hoverTime.textContent = this.formatTime(time);
       this.progressHover.style.left = (e.clientX - rect.left) + 'px';
     });
 
-    // Progress drag
+    // Dragging seekbar
     let isDragging = false;
-    this.progressContainer.addEventListener('mousedown', (e) => {
+    this.progressContainer.addEventListener('mousedown', () => {
       isDragging = true;
       this.isSeeking = true;
     });
@@ -121,7 +166,7 @@ class VideoPlayerController {
         let pct = (e.clientX - rect.left) / rect.width;
         pct = Math.max(0, Math.min(1, pct));
         this.progressBar.style.width = (pct * 100) + '%';
-        this.currentTimeEl.textContent = this.formatTime(pct * this.video.duration);
+        this.currentTimeEl.textContent = this.formatTime(pct * (this.video.duration || 0));
       }
     });
 
@@ -132,17 +177,16 @@ class VideoPlayerController {
         const rect = this.progressContainer.getBoundingClientRect();
         let pct = (e.clientX - rect.left) / rect.width;
         pct = Math.max(0, Math.min(1, pct));
-        this.seekTo(pct * this.video.duration, true);
+        this.seekTo(pct * (this.video.duration || 0), true);
       }
     });
 
-    // Volume
+    // Volume slider
     this.volumeSlider.addEventListener('input', (e) => {
       this.setVolume(parseFloat(e.target.value));
     });
 
-    // Controls auto-hide
-    let mouseMoveTimer;
+    // Controls auto-hide on mouse idle
     this.wrapper.addEventListener('mousemove', () => {
       this.controls.classList.add('force-show');
       this.wrapper.style.cursor = 'default';
@@ -161,30 +205,49 @@ class VideoPlayerController {
       }
     });
 
-    // Double click to fullscreen
-    this.video.addEventListener('dblclick', () => this.toggleFullscreen());
+    // Click debounce to eliminate double-click play/pause accidental toggle
+    let clickTimer = null;
+    this.video.addEventListener('click', (e) => {
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+      }
+      clickTimer = setTimeout(() => {
+        this.togglePlay();
+        clickTimer = null;
+      }, 250);
+    });
 
-    // Click to play/pause
-    this.video.addEventListener('click', () => this.togglePlay());
+    this.video.addEventListener('dblclick', (e) => {
+      if (clickTimer) {
+        clearTimeout(clickTimer);
+        clickTimer = null;
+      }
+      this.toggleFullscreen();
+    });
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-      // Don't intercept when typing in inputs
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (!document.getElementById('room-page').classList.contains('active')) return;
 
       switch (e.key) {
         case ' ':
         case 'k':
+        case 'K':
           e.preventDefault();
           this.togglePlay();
           break;
         case 'ArrowLeft':
+        case 'j':
+        case 'J':
           e.preventDefault();
           this.skip(-10);
           this.showKeyHint('⏪ -10s');
           break;
         case 'ArrowRight':
+        case 'l':
+        case 'L':
           e.preventDefault();
           this.skip(10);
           this.showKeyHint('⏩ +10s');
@@ -200,35 +263,50 @@ class VideoPlayerController {
           this.showKeyHint(`🔉 ${Math.round(this.video.volume * 100)}%`);
           break;
         case 'f':
+        case 'F':
           e.preventDefault();
           this.toggleFullscreen();
           break;
         case 'm':
+        case 'M':
           e.preventDefault();
           this.toggleMute();
           break;
-        case 'j':
-          e.preventDefault();
-          this.skip(-10);
-          this.showKeyHint('⏪ -10s');
-          break;
-        case 'l':
-          e.preventDefault();
-          this.skip(10);
-          this.showKeyHint('⏩ +10s');
-          break;
         case 't':
+        case 'T':
           e.preventDefault();
           this.toggleTheater();
           break;
         case 'p':
+        case 'P':
           e.preventDefault();
           this.togglePiP();
           break;
+        case 'b':
+        case 'B':
+          e.preventDefault();
+          this.cycleAudioBoost();
+          break;
+        case '[':
+          e.preventDefault();
+          this.adjustSubtitleDelay(-0.5);
+          break;
+        case ']':
+          e.preventDefault();
+          this.adjustSubtitleDelay(0.5);
+          break;
+      }
+    });
+
+    // Screen visibility change (re-request wake lock if playing)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.isPlaying) {
+        this.requestWakeLock();
       }
     });
   }
 
+  // ---- MEDIA LOADING ----
   loadMedia(media) {
     this.video.src = media.path;
     this.video.load();
@@ -272,10 +350,17 @@ class VideoPlayerController {
     }
   }
 
+  // ---- PLAY / PAUSE / SEEK ----
   togglePlay() {
     if (!this.video.src) return;
     if (this.video.paused) {
-      this.video.play();
+      const p = this.video.play();
+      if (p !== undefined) {
+        p.catch(err => {
+          console.warn('Playback prevented by browser autoplay policy:', err);
+          this.showNotification('Click screen to allow audio/video playback', 'warning');
+        });
+      }
       if (window.socket) {
         window.socket.emit('play', { time: this.video.currentTime });
       }
@@ -296,15 +381,19 @@ class VideoPlayerController {
 
   skip(seconds) {
     if (!this.video.src) return;
-    const newTime = Math.max(0, Math.min(this.video.duration, this.video.currentTime + seconds));
+    const newTime = Math.max(0, Math.min(this.video.duration || 0, this.video.currentTime + seconds));
     this.seekTo(newTime, true);
   }
 
+  // ---- VOLUME & AUDIO BOOST ----
   setVolume(val) {
     this.video.volume = val;
     this.volumeSlider.value = val;
     this.updateVolumeIcon();
-    if (val > 0) this.lastVolume = val;
+    if (val > 0) {
+      this.lastVolume = val;
+      localStorage.setItem('syncwatch-volume', val.toString());
+    }
   }
 
   toggleMute() {
@@ -312,10 +401,48 @@ class VideoPlayerController {
       this.lastVolume = this.video.volume;
       this.setVolume(0);
     } else {
-      this.setVolume(this.lastVolume || 0.5);
+      this.setVolume(this.lastVolume || 0.8);
     }
   }
 
+  initAudioBooster() {
+    if (this.audioContext) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioCtx();
+      const source = this.audioContext.createMediaElementSource(this.video);
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.gain.value = this.audioBoostLevel;
+      source.connect(this.gainNode);
+      this.gainNode.connect(this.audioContext.destination);
+    } catch (e) {
+      console.warn('Audio booster unsupported or restricted:', e);
+    }
+  }
+
+  cycleAudioBoost() {
+    this.initAudioBooster();
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+
+    if (this.audioBoostLevel === 1.0) {
+      this.audioBoostLevel = 1.5;
+      this.showKeyHint('🔊 Boost: 150%');
+    } else if (this.audioBoostLevel === 1.5) {
+      this.audioBoostLevel = 2.0;
+      this.showKeyHint('🔥 Boost: 200%');
+    } else {
+      this.audioBoostLevel = 1.0;
+      this.showKeyHint('🔉 Normal: 100%');
+    }
+
+    if (this.gainNode) {
+      this.gainNode.gain.value = this.audioBoostLevel;
+    }
+  }
+
+  // ---- SPEED & FULLSCREEN ----
   cycleSpeed() {
     const idx = this.speeds.indexOf(this.currentSpeed);
     this.currentSpeed = this.speeds[(idx + 1) % this.speeds.length];
@@ -331,7 +458,7 @@ class VideoPlayerController {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      this.wrapper.requestFullscreen();
+      this.wrapper.requestFullscreen().catch(() => {});
     }
   }
 
@@ -347,10 +474,181 @@ class VideoPlayerController {
         await this.video.requestPictureInPicture();
       }
     } catch (e) {
-      this.showNotification('PiP not supported', 'error');
+      this.showNotification('Picture-in-Picture not supported on this browser', 'error');
     }
   }
 
+  // ---- SCREEN WAKE LOCK (Laptops) ----
+  async requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator && !this.wakeLock) {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => {
+          this.wakeLock = null;
+        });
+      }
+    } catch (err) {
+      // Ignore wake lock restrictions
+    }
+  }
+
+  releaseWakeLock() {
+    if (this.wakeLock) {
+      this.wakeLock.release().catch(() => {});
+      this.wakeLock = null;
+    }
+  }
+
+  // ---- SUBTITLES & OFFSET ----
+  loadSubtitles(pathOrBlobUrl) {
+    const existing = this.video.querySelectorAll('track');
+    existing.forEach(t => t.remove());
+
+    const track = document.createElement('track');
+    track.kind = 'subtitles';
+    track.label = 'Subtitles';
+    track.srclang = 'en';
+    track.src = pathOrBlobUrl;
+    track.default = true;
+    this.video.appendChild(track);
+
+    this.video.addEventListener('loadedmetadata', () => {
+      if (this.video.textTracks.length > 0) {
+        this.video.textTracks[0].mode = 'showing';
+      }
+    }, { once: true });
+
+    if (this.video.textTracks.length > 0) {
+      this.video.textTracks[0].mode = 'showing';
+    }
+    this.showNotification('Subtitles loaded');
+  }
+
+  loadLocalSubtitleFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let content = e.target.result;
+      content = content.replace(/^\uFEFF/, ''); // Strip BOM
+
+      let vttContent = content;
+      if (file.name.toLowerCase().endsWith('.srt')) {
+        vttContent = 'WEBVTT\n\n' + content
+          .replace(/\r\n/g, '\n')
+          .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+      }
+
+      const blob = new Blob([vttContent], { type: 'text/vtt' });
+      const blobUrl = URL.createObjectURL(blob);
+      this.loadSubtitles(blobUrl);
+      showToast(`Loaded subtitle: ${file.name}`, 'success');
+    };
+    reader.readAsText(file);
+  }
+
+  adjustSubtitleDelay(deltaSeconds) {
+    this.subtitleOffset += deltaSeconds;
+    const track = this.video.textTracks?.[0];
+    if (track && track.cues) {
+      for (let i = 0; i < track.cues.length; i++) {
+        const cue = track.cues[i];
+        cue.startTime += deltaSeconds;
+        cue.endTime += deltaSeconds;
+      }
+    }
+    const sign = this.subtitleOffset > 0 ? '+' : '';
+    this.showKeyHint(`Subtitles: ${sign}${this.subtitleOffset.toFixed(1)}s`);
+  }
+
+  // ---- SYNC PROTOCOL METHODS ----
+  syncPlay(time) {
+    this.syncLock = true;
+    if (Math.abs(this.video.currentTime - time) > 0.3) {
+      this.video.currentTime = time;
+    }
+    const p = this.video.play();
+    if (p !== undefined) {
+      p.catch(() => {
+        this.showNotification('Click screen to allow synchronized playback', 'warning');
+      });
+    }
+    setTimeout(() => this.syncLock = false, 500);
+  }
+
+  syncPause(time) {
+    this.syncLock = true;
+    if (Math.abs(this.video.currentTime - time) > 0.3) {
+      this.video.currentTime = time;
+    }
+    this.video.pause();
+    setTimeout(() => this.syncLock = false, 500);
+  }
+
+  syncSeek(time) {
+    this.syncLock = true;
+    this.video.currentTime = time;
+    setTimeout(() => this.syncLock = false, 500);
+  }
+
+  syncPlaybackRate(rate) {
+    this.currentSpeed = rate;
+    this.video.playbackRate = rate;
+    this.speedBtn.textContent = rate + 'x';
+  }
+
+  // Gentle drift correction from host heartbeat
+  handleSyncHeartbeat({ time, isPlaying, rate }) {
+    if (this.syncLock) return;
+    if (isPlaying && this.video.paused) {
+      this.syncPlay(time);
+      return;
+    }
+    if (!isPlaying && !this.video.paused) {
+      this.syncPause(time);
+      return;
+    }
+
+    const drift = this.video.currentTime - time; // Positive = ahead, negative = behind
+    const absDrift = Math.abs(drift);
+
+    if (absDrift > 2.0) {
+      // Hard seek if drift is large (e.g. Wi-Fi paused for 2+ seconds)
+      this.video.currentTime = time;
+      this.video.playbackRate = rate;
+    } else if (absDrift > 0.3) {
+      // Gentle pitch-free catch-up
+      if (drift > 0) {
+        this.video.playbackRate = rate * 0.95; // Slightly slow down
+      } else {
+        this.video.playbackRate = rate * 1.05; // Slightly speed up to catch up
+      }
+    } else {
+      // Perfectly in sync
+      if (this.video.playbackRate !== rate) {
+        this.video.playbackRate = rate;
+      }
+    }
+  }
+
+  // ---- FULLSCREEN CHAT OVERLAY ----
+  showFullscreenChatMessage(msg) {
+    if (!document.fullscreenElement) return;
+
+    const el = document.createElement('div');
+    el.className = 'fs-chat-bubble';
+    el.innerHTML = `
+      <span class="fs-chat-avatar">${msg.avatar || '👤'}</span>
+      <span class="fs-chat-name">${this.escapeHtml(msg.userName)}:</span>
+      <span class="fs-chat-text">${this.escapeHtml(msg.text)}</span>
+    `;
+
+    this.fullscreenChatOverlay.appendChild(el);
+    setTimeout(() => {
+      el.classList.add('fade-out');
+      setTimeout(() => el.remove(), 400);
+    }, 4500);
+  }
+
+  // ---- UI HELPERS ----
   updatePlayButton() {
     const playIcon = this.playPauseBtn.querySelector('.icon-play');
     const pauseIcon = this.playPauseBtn.querySelector('.icon-pause');
@@ -375,59 +673,6 @@ class VideoPlayerController {
     }
   }
 
-  // Sync methods (called from socket events)
-  syncPlay(time) {
-    this.syncLock = true;
-    this.video.currentTime = time;
-    this.video.play();
-    setTimeout(() => this.syncLock = false, 500);
-  }
-
-  syncPause(time) {
-    this.syncLock = true;
-    this.video.currentTime = time;
-    this.video.pause();
-    setTimeout(() => this.syncLock = false, 500);
-  }
-
-  syncSeek(time) {
-    this.syncLock = true;
-    this.video.currentTime = time;
-    setTimeout(() => this.syncLock = false, 500);
-  }
-
-  syncPlaybackRate(rate) {
-    this.currentSpeed = rate;
-    this.video.playbackRate = rate;
-    this.speedBtn.textContent = rate + 'x';
-  }
-
-  loadSubtitles(path) {
-    // Remove existing tracks
-    const existing = this.video.querySelectorAll('track');
-    existing.forEach(t => t.remove());
-
-    const track = document.createElement('track');
-    track.kind = 'subtitles';
-    track.label = 'Subtitles';
-    track.srclang = 'en';
-    track.src = path;
-    track.default = true;
-    this.video.appendChild(track);
-
-    // Enable the track
-    this.video.addEventListener('loadedmetadata', () => {
-      if (this.video.textTracks.length > 0) {
-        this.video.textTracks[0].mode = 'showing';
-      }
-    }, { once: true });
-
-    if (this.video.textTracks.length > 0) {
-      this.video.textTracks[0].mode = 'showing';
-    }
-    this.showNotification('Subtitles loaded');
-  }
-
   showNotification(text, type = 'info') {
     const el = document.createElement('div');
     el.className = 'player-notification';
@@ -437,7 +682,7 @@ class VideoPlayerController {
     setTimeout(() => {
       el.classList.add('removing');
       setTimeout(() => el.remove(), 300);
-    }, 3000);
+    }, 3500);
   }
 
   showKeyHint(text) {
@@ -462,7 +707,7 @@ class VideoPlayerController {
     el.textContent = emoji;
     el.style.left = (20 + Math.random() * 60) + '%';
     this.floatingReactions.appendChild(el);
-    setTimeout(() => el.remove(), 2000);
+    setTimeout(() => el.remove(), 2200);
   }
 
   formatTime(s) {
@@ -473,12 +718,18 @@ class VideoPlayerController {
     if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
     return `${m}:${sec.toString().padStart(2, '0')}`;
   }
+
+  escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
 }
 
 // Global instance
 let player;
 
-// Global functions for HTML onclick handlers
+// Global HTML onclick handlers
 function togglePlay() { player?.togglePlay(); }
 function skip(s) { player?.skip(s); }
 function toggleMute() { player?.toggleMute(); }
@@ -486,6 +737,7 @@ function cycleSpeed() { player?.cycleSpeed(); }
 function toggleFullscreen() { player?.toggleFullscreen(); }
 function toggleTheater() { player?.toggleTheater(); }
 function togglePiP() { player?.togglePiP(); }
+function cycleAudioBoost() { player?.cycleAudioBoost(); }
 function toggleSubtitlesPanel() {
   const sub = document.getElementById('subtitle-upload-input');
   sub.click();
