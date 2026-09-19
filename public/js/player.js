@@ -47,11 +47,56 @@ class VideoPlayerController {
     // Fullscreen chat overlay container
     this.initFullscreenChatOverlay();
 
+    // Cinema Ambient Glow
+    this.initAmbientGlow();
+
     // Heartbeat timer for host
     this.heartbeatTimer = null;
 
     this.initEvents();
     this.setVolume(this.lastVolume);
+  }
+
+  initAmbientGlow() {
+    this.ambientCanvas = document.getElementById('ambient-glow-canvas');
+    if (!this.ambientCanvas) return;
+    this.ambientCtx = this.ambientCanvas.getContext('2d', { willReadFrequently: false });
+    this.ambientCanvas.width = 16;
+    this.ambientCanvas.height = 9;
+    this.ambientEnabled = localStorage.getItem('syncwatch-ambient') !== 'false';
+    this.ambientLoopRunning = false;
+
+    const sampleFrame = () => {
+      if (!this.ambientEnabled || !this.isPlaying || this.video.paused || this.video.ended || this.video.readyState < 2) {
+        this.ambientLoopRunning = false;
+        return;
+      }
+      try {
+        if (this.ambientCtx) {
+          this.ambientCtx.drawImage(this.video, 0, 0, 16, 9);
+        }
+      } catch (err) {
+        // Suppress potential cross-origin taint
+      }
+      setTimeout(() => {
+        if (this.ambientLoopRunning) requestAnimationFrame(sampleFrame);
+      }, 120);
+    };
+
+    const startAmbient = () => {
+      if (!this.ambientLoopRunning) {
+        this.ambientLoopRunning = true;
+        sampleFrame();
+      }
+    };
+
+    this.video.addEventListener('play', startAmbient);
+    this.video.addEventListener('playing', startAmbient);
+    this.video.addEventListener('pause', () => { this.ambientLoopRunning = false; });
+    this.video.addEventListener('ended', () => {
+      this.ambientLoopRunning = false;
+      if (this.ambientCtx) this.ambientCtx.clearRect(0, 0, 16, 9);
+    });
   }
 
   initFullscreenChatOverlay() {
@@ -321,6 +366,22 @@ class VideoPlayerController {
         case ']':
           e.preventDefault();
           this.adjustSubtitleDelay(0.5);
+          break;
+        case 'Escape':
+          this.closeSubtitlesPopover();
+          if (typeof closeDropModal === 'function') closeDropModal();
+          break;
+        case '1':
+          if (document.getElementById('drop-action-modal')?.classList.contains('active')) {
+            e.preventDefault();
+            if (typeof handleDropChoice === 'function') handleDropChoice('local');
+          }
+          break;
+        case '2':
+          if (document.getElementById('drop-action-modal')?.classList.contains('active')) {
+            e.preventDefault();
+            if (typeof handleDropChoice === 'function') handleDropChoice('upload');
+          }
           break;
       }
     });
@@ -606,16 +667,18 @@ class VideoPlayerController {
     track.srclang = 'en';
     track.src = pathOrBlobUrl;
     track.default = true;
+
+    // Track load event fires when the VTT/SRT resource is parsed
+    track.addEventListener('load', () => {
+      if (track.track) {
+        track.track.mode = 'showing';
+      }
+    });
+
     this.video.appendChild(track);
 
-    this.video.addEventListener('loadedmetadata', () => {
-      if (this.video.textTracks.length > 0) {
-        this.video.textTracks[0].mode = 'showing';
-      }
-    }, { once: true });
-
-    if (this.video.textTracks.length > 0) {
-      this.video.textTracks[0].mode = 'showing';
+    if (track.track) {
+      track.track.mode = 'showing';
     }
 
     const statusEl = document.getElementById('popover-sub-status');
@@ -647,12 +710,16 @@ class VideoPlayerController {
 
   adjustSubtitleDelay(deltaSeconds) {
     this.subtitleOffset = Math.round((this.subtitleOffset + deltaSeconds) * 10) / 10;
-    const track = this.video.textTracks?.[0];
-    if (track && track.cues) {
-      for (let i = 0; i < track.cues.length; i++) {
-        const cue = track.cues[i];
-        cue.startTime += deltaSeconds;
-        cue.endTime += deltaSeconds;
+    if (this.video.textTracks) {
+      for (let t = 0; t < this.video.textTracks.length; t++) {
+        const track = this.video.textTracks[t];
+        if (track && track.mode !== 'disabled' && track.cues) {
+          for (let i = 0; i < track.cues.length; i++) {
+            const cue = track.cues[i];
+            cue.startTime = Math.max(0, cue.startTime + deltaSeconds);
+            cue.endTime = Math.max(0, cue.endTime + deltaSeconds);
+          }
+        }
       }
     }
     const sign = this.subtitleOffset > 0 ? '+' : '';
@@ -723,7 +790,12 @@ class VideoPlayerController {
   syncPlaybackRate(rate) {
     this.currentSpeed = rate;
     this.video.playbackRate = rate;
-    this.speedBtn.textContent = rate + 'x';
+    const badge = document.getElementById('speed-badge');
+    if (badge) {
+      badge.textContent = rate + 'x';
+    } else if (this.speedBtn) {
+      this.speedBtn.textContent = rate + 'x';
+    }
   }
 
   // Gentle drift correction from host heartbeat

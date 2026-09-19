@@ -122,10 +122,6 @@ class ChatController {
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
     // Links
     text = text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--accent-primary)">$1</a>');
-    // Emoji-only messages get bigger
-    if (/^[\p{Emoji}\s]{1,5}$/u.test(text.replace(/<[^>]*>/g, ''))) {
-      text = `<span style="font-size: 2rem">${text}</span>`;
-    }
     return text;
   }
 

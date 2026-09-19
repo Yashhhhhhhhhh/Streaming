@@ -238,6 +238,9 @@
               </div>
             </div>
 
+            <!-- Ambient Glow Canvas -->
+            <canvas class="ambient-glow-canvas" id="ambient-glow-canvas"></canvas>
+
             <!-- Video element -->
             <video id="video-player" crossorigin="anonymous" preload="auto" playsinline></video>
 
@@ -536,6 +539,34 @@
           <input type="text" id="gemini-api-key-input" placeholder="AIzaSy..." autocomplete="off">
         </div>
         <button class="btn-primary" onclick="saveGeminiApiKey()">Save Key</button>
+      </div>
+    </div>
+
+    <!-- Media Drop Action Modal -->
+    <div id="drop-action-modal" class="modal-overlay" onclick="closeDropModal()">
+      <div class="modal-content drop-modal-content" onclick="event.stopPropagation()">
+        <button class="modal-close" onclick="closeDropModal()">&times;</button>
+        <h2>Media File Detected</h2>
+        <div class="drop-filename-display" id="drop-modal-filename">movie.mp4</div>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem;line-height:1.5;">
+          Choose playback protocol for this session:
+        </p>
+        <div class="drop-modal-actions">
+          <button class="drop-action-card" onclick="handleDropChoice('local')">
+            <span class="action-btn-shortcut">1</span>
+            <div class="action-btn-text">
+              <strong>Dual-Local Playback</strong>
+              <span>Instant 0ms latency, zero server bandwidth, native 4K</span>
+            </div>
+          </button>
+          <button class="drop-action-card primary" onclick="handleDropChoice('upload')">
+            <span class="action-btn-shortcut">2</span>
+            <div class="action-btn-text">
+              <strong>Host Stream (Upload)</strong>
+              <span>Upload to server to stream directly to partner</span>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   </div>

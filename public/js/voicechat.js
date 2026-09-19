@@ -18,6 +18,7 @@ class VoiceChatController {
     this.audioContext = null;
     this.analyser = null;
     this.micVisualizerTimer = null;
+    this.pendingOffers = new Map();
   }
 
   async toggle() {
@@ -40,16 +41,25 @@ class VoiceChatController {
       });
 
       this.isActive = true;
+      this.btn.classList.remove('incoming-call');
       this.btn.classList.add('active');
       this.btn.title = 'Voice chat (active - click to leave)';
 
       // Setup audio level visualizer
       this.startAudioVisualizer();
 
-      // Connect to all existing members
+      // Process any pending incoming offers first
+      if (this.pendingOffers && this.pendingOffers.size > 0) {
+        for (const [from, offer] of this.pendingOffers.entries()) {
+          await this.acceptOffer(from, offer);
+        }
+        this.pendingOffers.clear();
+      }
+
+      // Connect to all other existing members
       if (window.roomMembers) {
         for (const member of window.roomMembers) {
-          if (member.id !== window.socket?.id) {
+          if (member.id !== window.socket?.id && !this.peerConnections.has(member.id)) {
             await this.createOffer(member.id);
           }
         }
@@ -118,7 +128,9 @@ class VoiceChatController {
 
     this.isActive = false;
     this.btn.classList.remove('active');
+    this.btn.classList.remove('incoming-call');
     this.btn.title = 'Voice chat';
+    if (this.pendingOffers) this.pendingOffers.clear();
     showToast('Voice chat ended', 'info');
   }
 
@@ -134,8 +146,22 @@ class VoiceChatController {
   }
 
   async handleOffer(from, offer) {
-    if (!this.isActive) await this.start();
+    if (!this.isActive) {
+      if (!this.pendingOffers) this.pendingOffers = new Map();
+      this.pendingOffers.set(from, offer);
 
+      const member = window.roomMembers?.find(m => m.id === from);
+      const name = member?.name || 'Ally';
+      showToast(`${name} opened voice comms. Click Voice button to join.`, 'info');
+      this.btn.classList.add('incoming-call');
+      this.btn.title = `Incoming voice comms from ${name} - Click to connect`;
+      return;
+    }
+
+    await this.acceptOffer(from, offer);
+  }
+
+  async acceptOffer(from, offer) {
     const pc = this.createPeerConnection(from);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await pc.createAnswer();

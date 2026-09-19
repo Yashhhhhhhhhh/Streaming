@@ -280,7 +280,8 @@ function connectToRoom(roomId, userName, avatar) {
   // Reactions
   window.socket.on('reaction', ({ emoji, userName }) => {
     player.showFloatingReaction(emoji);
-    player.showNotification(`${userName}: ${emoji}`);
+    const label = window.TACTICAL_REACTIONS?.[emoji]?.label || emoji;
+    player.showNotification(`${userName}: ${label}`);
   });
 
   // ---- MEMBER EVENTS ----
@@ -587,18 +588,56 @@ function initDragDrop() {
     if (files.length > 0) {
       const file = files[0];
       const lower = file.name.toLowerCase();
-      // Intelligent drop detection: if subtitle dropped, load as subtitles
+      // Intelligent drop detection: if subtitle dropped, load as subtitles directly
       if (lower.endsWith('.srt') || lower.endsWith('.vtt') || lower.endsWith('.ass') || lower.endsWith('.ssa')) {
         if (player) {
           player.loadLocalSubtitleFile(file);
         }
       } else {
-        const fileInput = document.getElementById('file-upload-input');
-        fileInput.files = files;
-        handleFileUpload(fileInput);
+        promptMediaDropAction(file);
       }
     }
   });
+}
+
+let pendingDroppedFile = null;
+
+function promptMediaDropAction(file) {
+  pendingDroppedFile = file;
+  const modal = document.getElementById('drop-action-modal');
+  const filenameEl = document.getElementById('drop-modal-filename');
+  if (filenameEl) filenameEl.textContent = file.name;
+  if (modal) {
+    modal.classList.add('active');
+  } else {
+    // Fallback if modal not rendered: load locally for instant playback
+    if (player) player.loadLocalMedia(file);
+  }
+}
+
+function handleDropChoice(choice) {
+  const modal = document.getElementById('drop-action-modal');
+  if (modal) modal.classList.remove('active');
+  if (!pendingDroppedFile) return;
+
+  const file = pendingDroppedFile;
+  pendingDroppedFile = null;
+
+  if (choice === 'local') {
+    if (player) player.loadLocalMedia(file);
+  } else if (choice === 'upload') {
+    const fileInput = document.getElementById('file-upload-input');
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    handleFileUpload(fileInput);
+  }
+}
+
+function closeDropModal() {
+  const modal = document.getElementById('drop-action-modal');
+  if (modal) modal.classList.remove('active');
+  pendingDroppedFile = null;
 }
 
 // ============ SIDEBAR ============
