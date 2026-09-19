@@ -1,0 +1,357 @@
+/* ============ VIDEO PLAYER ============ */
+.player-wrapper {
+  position: relative;
+  flex: 1;
+  background: var(--player-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 0;
+  cursor: default;
+}
+
+.player-wrapper:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Empty state */
+.player-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  animation: fadeIn 0.6s ease-out;
+}
+
+.player-empty .empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+.player-empty h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.player-empty p {
+  margin-bottom: 1.5rem;
+  color: var(--text-muted);
+}
+
+.upload-trigger {
+  display: inline-flex;
+  width: auto;
+  padding: 0.7rem 1.5rem;
+}
+
+/* Video element */
+#video-player {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+#video-player.visible {
+  display: block;
+}
+
+/* ============ CONTROLS OVERLAY ============ */
+.controls-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.4s;
+  cursor: default;
+}
+
+.controls-overlay.visible {
+  display: flex;
+}
+
+.player-wrapper:hover .controls-overlay.visible,
+.controls-overlay.force-show {
+  opacity: 1;
+}
+
+/* Center play button */
+.center-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.center-play-btn.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.center-play-btn:hover {
+  background: var(--accent-primary);
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 0 40px var(--accent-glow);
+}
+
+/* ============ CONTROLS BAR ============ */
+.controls-bar {
+  background: var(--controls-bg);
+  padding: 0.75rem 1rem 0.6rem;
+}
+
+/* Progress bar */
+.progress-container {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  background: var(--progress-bg);
+  border-radius: 3px;
+  cursor: pointer;
+  margin-bottom: 0.6rem;
+  transition: height 0.2s;
+}
+
+.progress-container:hover {
+  height: 8px;
+}
+
+.progress-buffer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--progress-buffer);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent-gradient);
+  background-size: 200% 100%;
+  border-radius: 3px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.progress-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  transform: translateX(50%) scale(0);
+  transition: transform 0.2s;
+}
+
+.progress-container:hover .progress-thumb {
+  transform: translateX(50%) scale(1);
+}
+
+.progress-hover {
+  position: absolute;
+  bottom: 20px;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.progress-container:hover .progress-hover { opacity: 1; }
+
+.hover-time {
+  background: var(--bg-secondary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Controls row */
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.controls-left, .controls-right {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.ctrl-btn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+/* Volume */
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.volume-slider {
+  width: 0;
+  opacity: 0;
+  transition: width 0.3s, opacity 0.3s;
+  -webkit-appearance: none;
+  height: 4px;
+  background: var(--progress-bg);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-control:hover .volume-slider {
+  width: 80px;
+  opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+}
+
+/* Time */
+.time-display {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.8);
+  font-variant-numeric: tabular-nums;
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+
+/* Speed */
+.speed-control {
+  position: relative;
+}
+
+/* ============ PLAYER NOTIFICATIONS ============ */
+.player-notifications {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 10;
+}
+
+.player-notification {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.85rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  color: white;
+  animation: fadeInDown 0.3s ease-out;
+}
+
+.player-notification.removing {
+  animation: fadeIn 0.3s ease-in reverse forwards;
+}
+
+/* ============ FLOATING REACTIONS ============ */
+.floating-reactions {
+  position: absolute;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.floating-reaction {
+  position: absolute;
+  font-size: 2rem;
+  animation: floatReaction 2s ease-out forwards;
+}
+
+/* ============ SUBTITLE STYLING ============ */
+#video-player::cue {
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  font-size: 1.1rem;
+  font-family: 'Inter', sans-serif;
+  padding: 0.2em 0.5em;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+/* ============ KEYBOARD SHORTCUTS HINT ============ */
+.shortcuts-hint {
+  position: absolute;
+  bottom: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 1rem 1.5rem;
+  border-radius: var(--border-radius);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 15;
+}
+
+.shortcuts-hint.show {
+  opacity: 1;
+  animation: fadeInScale 0.2s ease-out;
+}

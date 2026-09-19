@@ -1,0 +1,189 @@
+/* ============ THEME SYSTEM ============ */
+:root {
+  --transition-speed: 0.3s;
+  --border-radius: 12px;
+  --border-radius-sm: 8px;
+  --border-radius-lg: 20px;
+  --border-radius-xl: 28px;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.15);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.2);
+  --shadow-xl: 0 16px 60px rgba(0,0,0,0.3);
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+}
+
+/* Midnight Theme (Default) */
+[data-theme="midnight"] {
+  --bg-primary: #0a0a1a;
+  --bg-secondary: #111128;
+  --bg-tertiary: #1a1a3e;
+  --bg-card: rgba(17, 17, 40, 0.85);
+  --bg-glass: rgba(17, 17, 40, 0.6);
+  --bg-hover: rgba(99, 102, 241, 0.1);
+  --bg-input: rgba(26, 26, 62, 0.8);
+  --text-primary: #f0f0ff;
+  --text-secondary: #a0a0cc;
+  --text-muted: #6060a0;
+  --accent-primary: #6366f1;
+  --accent-secondary: #8b5cf6;
+  --accent-gradient: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+  --accent-gradient-2: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --accent-glow: rgba(99, 102, 241, 0.4);
+  --border-color: rgba(99, 102, 241, 0.15);
+  --border-active: rgba(99, 102, 241, 0.4);
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --player-bg: #000;
+  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
+  --progress-bg: rgba(255,255,255,0.15);
+  --progress-buffer: rgba(255,255,255,0.25);
+  --progress-fill: var(--accent-primary);
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: var(--accent-gradient-2);
+  --chat-bubble-other: var(--bg-tertiary);
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(99, 102, 241, 0.3);
+  --particle-color: rgba(99, 102, 241, 0.15);
+}
+
+/* Aurora Theme */
+[data-theme="aurora"] {
+  --bg-primary: #0d1117;
+  --bg-secondary: #0f1923;
+  --bg-tertiary: #132030;
+  --bg-card: rgba(15, 25, 35, 0.85);
+  --bg-glass: rgba(15, 25, 35, 0.6);
+  --bg-hover: rgba(56, 189, 248, 0.1);
+  --bg-input: rgba(19, 32, 48, 0.8);
+  --text-primary: #e0f2fe;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-primary: #38bdf8;
+  --accent-secondary: #06b6d4;
+  --accent-gradient: linear-gradient(135deg, #06b6d4, #38bdf8, #818cf8);
+  --accent-gradient-2: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  --accent-glow: rgba(56, 189, 248, 0.4);
+  --border-color: rgba(56, 189, 248, 0.12);
+  --border-active: rgba(56, 189, 248, 0.35);
+  --success: #34d399;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --player-bg: #000;
+  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
+  --progress-bg: rgba(255,255,255,0.15);
+  --progress-buffer: rgba(255,255,255,0.25);
+  --progress-fill: var(--accent-primary);
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: var(--accent-gradient-2);
+  --chat-bubble-other: var(--bg-tertiary);
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(56, 189, 248, 0.3);
+  --particle-color: rgba(56, 189, 248, 0.12);
+}
+
+/* Sakura Theme */
+[data-theme="sakura"] {
+  --bg-primary: #1a0a1a;
+  --bg-secondary: #1f0f20;
+  --bg-tertiary: #2a1530;
+  --bg-card: rgba(31, 15, 32, 0.85);
+  --bg-glass: rgba(31, 15, 32, 0.6);
+  --bg-hover: rgba(236, 72, 153, 0.1);
+  --bg-input: rgba(42, 21, 48, 0.8);
+  --text-primary: #fce7f3;
+  --text-secondary: #d4a0c0;
+  --text-muted: #9a6090;
+  --accent-primary: #ec4899;
+  --accent-secondary: #f472b6;
+  --accent-gradient: linear-gradient(135deg, #ec4899, #f472b6, #fb923c);
+  --accent-gradient-2: linear-gradient(135deg, #ec4899, #f472b6);
+  --accent-glow: rgba(236, 72, 153, 0.4);
+  --border-color: rgba(236, 72, 153, 0.12);
+  --border-active: rgba(236, 72, 153, 0.35);
+  --success: #4ade80;
+  --danger: #fb7185;
+  --warning: #fcd34d;
+  --player-bg: #000;
+  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
+  --progress-bg: rgba(255,255,255,0.15);
+  --progress-buffer: rgba(255,255,255,0.25);
+  --progress-fill: var(--accent-primary);
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: var(--accent-gradient-2);
+  --chat-bubble-other: var(--bg-tertiary);
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(236, 72, 153, 0.3);
+  --particle-color: rgba(236, 72, 153, 0.12);
+}
+
+/* Emerald Theme */
+[data-theme="emerald"] {
+  --bg-primary: #0a1a0f;
+  --bg-secondary: #0f2818;
+  --bg-tertiary: #153320;
+  --bg-card: rgba(15, 40, 24, 0.85);
+  --bg-glass: rgba(15, 40, 24, 0.6);
+  --bg-hover: rgba(52, 211, 153, 0.1);
+  --bg-input: rgba(21, 51, 32, 0.8);
+  --text-primary: #d1fae5;
+  --text-secondary: #86d4a8;
+  --text-muted: #4a9a6e;
+  --accent-primary: #34d399;
+  --accent-secondary: #10b981;
+  --accent-gradient: linear-gradient(135deg, #10b981, #34d399, #6ee7b7);
+  --accent-gradient-2: linear-gradient(135deg, #10b981, #34d399);
+  --accent-glow: rgba(52, 211, 153, 0.4);
+  --border-color: rgba(52, 211, 153, 0.12);
+  --border-active: rgba(52, 211, 153, 0.35);
+  --success: #4ade80;
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --player-bg: #000;
+  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
+  --progress-bg: rgba(255,255,255,0.15);
+  --progress-buffer: rgba(255,255,255,0.25);
+  --progress-fill: var(--accent-primary);
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: var(--accent-gradient-2);
+  --chat-bubble-other: var(--bg-tertiary);
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(52, 211, 153, 0.3);
+  --particle-color: rgba(52, 211, 153, 0.12);
+}
+
+/* Sunset Theme */
+[data-theme="sunset"] {
+  --bg-primary: #1a0f0a;
+  --bg-secondary: #251510;
+  --bg-tertiary: #301a15;
+  --bg-card: rgba(37, 21, 16, 0.85);
+  --bg-glass: rgba(37, 21, 16, 0.6);
+  --bg-hover: rgba(251, 146, 60, 0.1);
+  --bg-input: rgba(48, 26, 21, 0.8);
+  --text-primary: #fef3c7;
+  --text-secondary: #d4a87a;
+  --text-muted: #9a7050;
+  --accent-primary: #fb923c;
+  --accent-secondary: #f97316;
+  --accent-gradient: linear-gradient(135deg, #f97316, #fb923c, #fbbf24);
+  --accent-gradient-2: linear-gradient(135deg, #f97316, #fb923c);
+  --accent-glow: rgba(251, 146, 60, 0.4);
+  --border-color: rgba(251, 146, 60, 0.12);
+  --border-active: rgba(251, 146, 60, 0.35);
+  --success: #4ade80;
+  --danger: #fb7185;
+  --warning: #fcd34d;
+  --player-bg: #000;
+  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
+  --progress-bg: rgba(255,255,255,0.15);
+  --progress-buffer: rgba(255,255,255,0.25);
+  --progress-fill: var(--accent-primary);
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: var(--accent-gradient-2);
+  --chat-bubble-other: var(--bg-tertiary);
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: rgba(251, 146, 60, 0.3);
+  --particle-color: rgba(251, 146, 60, 0.12);
+}
