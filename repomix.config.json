@@ -1,0 +1,48 @@
+{
+  "$schema": "https://repomix.com/schemas/config.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "compress": false,
+    "topFilesLength": 10,
+    "showLineNumbers": false,
+    "copyToClipboard": false
+  },
+  "include": [
+    "server.js",
+    "watch.js",
+    "package.json",
+    "GEMINI.md",
+    "public/**/*",
+    "docs/**/*"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "uploads/**",
+      "node_modules/**",
+      ".git/**",
+      "*.mp4",
+      "*.mkv",
+      "*.webm",
+      "*.avi",
+      "*.mov",
+      "*.png",
+      "*.jpg",
+      "*.jpeg",
+      "*.gif",
+      "*.ico"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}
