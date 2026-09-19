@@ -40,7 +40,8 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     clientHost.emit('join-room', {
       roomId: 'test-recon',
       userName: 'Levi',
-      avatar: 'scout'
+      avatar: 'scout',
+      userId: 'usr_levi_test'
     });
 
     await hostJoinedPromise;
@@ -65,7 +66,8 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     clientViewer.emit('join-room', {
       roomId: 'test-recon',
       userName: 'Hange',
-      avatar: 'recon'
+      avatar: 'recon',
+      userId: 'usr_hange_test'
     });
 
     await Promise.all([viewerJoinedPromise, hostSawViewerPromise]);
@@ -253,6 +255,86 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     const createData = await createRes.json();
     assert.ok(createData.roomId);
     assert.equal(createData.success, true);
+  });
+
+  await t.test('12. Mobile background app-switch: unexpected disconnect triggers away status without member-left broadcast', async () => {
+    let memberLeftFired = false;
+    const memberLeftListener = () => { memberLeftFired = true; };
+    clientHost.on('member-left', memberLeftListener);
+
+    const awayPromise = new Promise((resolve) => {
+      clientHost.once('member-status-changed', ({ member }) => {
+        assert.equal(member.isAway, true);
+        assert.equal(member.name, 'Hange');
+        resolve();
+      });
+    });
+
+    // Simulate mobile phone switching away (disconnecting socket)
+    clientViewer.disconnect();
+
+    await awayPromise;
+    assert.equal(memberLeftFired, false, 'member-left must not be fired on mobile app switch during grace period');
+    clientHost.off('member-left', memberLeftListener);
+  });
+
+  await t.test('13. Mobile foreground recovery: reconnecting within grace period restores member without duplication', async () => {
+    // Reconnect clientViewer (simulating mobile tab foregrounding)
+    clientViewer = Client(`http://localhost:${testPort}`, { transports: ['websocket'] });
+    await new Promise((resolve) => clientViewer.connected ? resolve() : clientViewer.once('connect', resolve));
+
+    const statePromise = new Promise((resolve) => {
+      clientViewer.once('room-state', (data) => {
+        assert.equal(data.roomId, 'test-recon');
+        assert.equal(data.isReconnection, true);
+        resolve(data);
+      });
+    });
+
+    const hostSawReconnectPromise = new Promise((resolve) => {
+      clientHost.once('member-status-changed', ({ member, members }) => {
+        assert.equal(member.isAway, false);
+        assert.equal(member.name, 'Hange');
+        // Total members must strictly stay 2 without duplicate members
+        assert.equal(members.length, 2);
+        resolve();
+      });
+    });
+
+    clientViewer.emit('join-room', {
+      roomId: 'test-recon',
+      userName: 'Hange',
+      avatar: 'recon',
+      userId: 'usr_hange_test'
+    });
+
+    await Promise.all([statePromise, hostSawReconnectPromise]);
+  });
+
+  await t.test('14. Mobile sync request: request-room-sync returns real-time playback state and time', async () => {
+    const syncPromise = new Promise((resolve) => {
+      clientViewer.once('room-sync-update', (data) => {
+        assert.ok(typeof data.currentTime === 'number');
+        assert.ok('isPlaying' in data);
+        assert.ok('members' in data);
+        resolve();
+      });
+    });
+
+    clientViewer.emit('request-room-sync');
+    await syncPromise;
+  });
+
+  await t.test('15. Explicit leave: leave-room cleans up member immediately without waiting for grace period', async () => {
+    const hostSawLeavePromise = new Promise((resolve) => {
+      clientHost.once('member-left', ({ memberId, members }) => {
+        assert.equal(members.length, 1);
+        resolve();
+      });
+    });
+
+    clientViewer.emit('leave-room');
+    await hostSawLeavePromise;
   });
 
   // Clean teardown

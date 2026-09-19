@@ -11,7 +11,13 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   maxHttpBufferSize: 1e8,
-  cors: { origin: '*' }
+  cors: { origin: '*' },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes session recovery buffer
+    skipMiddlewares: true
+  },
+  pingTimeout: 30000,
+  pingInterval: 25000
 });
 
 // Ensure uploads directory exists
@@ -85,6 +91,85 @@ function getOrCreateRoom(roomId, hostName = 'Host') {
     room = rooms.get(id);
   }
   return room;
+}
+
+function cleanMember(m) {
+  if (!m) return null;
+  const { disconnectTimer, ...clean } = m;
+  return clean;
+}
+
+function finalizeMemberLeave(roomId, identifier, userName) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+
+  let targetSocketId = null;
+  let member = null;
+
+  for (const [sId, m] of room.members.entries()) {
+    if (sId === identifier || m.userId === identifier) {
+      targetSocketId = sId;
+      member = m;
+      break;
+    }
+  }
+
+  if (!member) return;
+
+  if (member.disconnectTimer) {
+    clearTimeout(member.disconnectTimer);
+    member.disconnectTimer = null;
+  }
+
+  room.members.delete(targetSocketId);
+
+  // Transfer host if necessary to next active member
+  if (room.host === targetSocketId && room.members.size > 0) {
+    let newHostId = null;
+    for (const [sId, m] of room.members.entries()) {
+      if (!m.isAway) {
+        newHostId = sId;
+        break;
+      }
+    }
+    if (!newHostId) newHostId = room.members.keys().next().value;
+
+    if (newHostId && room.members.has(newHostId)) {
+      room.host = newHostId;
+      room.members.get(newHostId).isHost = true;
+      io.to(newHostId).emit('promoted-to-host');
+    }
+  }
+
+  // Clean up empty temporary rooms after 30 minutes (permanently preserve 'cinema' room)
+  if (room.members.size === 0 && roomId && roomId.toLowerCase() !== 'cinema') {
+    const cleanupTimer = setTimeout(() => {
+      const r = rooms.get(roomId);
+      if (r && r.members.size === 0 && roomId.toLowerCase() !== 'cinema') {
+        rooms.delete(roomId);
+        const roomDir = path.join(uploadsDir, roomId);
+        if (fs.existsSync(roomDir)) {
+          fs.rmSync(roomDir, { recursive: true, force: true });
+        }
+      }
+    }, 30 * 60 * 1000);
+    if (cleanupTimer && cleanupTimer.unref) cleanupTimer.unref();
+  }
+
+  const sysMsg = {
+    id: uuidv4(),
+    type: 'system',
+    text: `${userName || member.name || 'Someone'} left the room`,
+    timestamp: Date.now()
+  };
+  room.chat.push(sysMsg);
+  io.to(roomId).emit('chat-message', sysMsg);
+
+  io.to(roomId).emit('member-left', {
+    memberId: targetSocketId,
+    userId: member.userId,
+    members: Array.from(room.members.values()).map(cleanMember)
+  });
 }
 
 // Pre-initialize permanent couple cinema room
@@ -504,31 +589,93 @@ app.delete('/api/room/:roomId/playlist/:mediaId', (req, res) => {
 io.on('connection', (socket) => {
   console.log(`[Socket] Connected: ${socket.id}`);
 
-  // Join room
-  socket.on('join-room', ({ roomId, userName, avatar }) => {
+  // Join room (with mobile session recovery)
+  socket.on('join-room', ({ roomId, userName, avatar, userId }) => {
     const room = getOrCreateRoom(roomId, userName);
+    const effectiveUserId = userId || socket.id;
 
     socket.join(roomId);
     socket.roomId = roomId;
     socket.userName = userName;
+    socket.userId = effectiveUserId;
     socket.avatar = avatar || 'scout';
 
+    // Check if this member is reconnecting (e.g. mobile app switch, Wi-Fi blip, or tab reload)
+    let existingMember = null;
+    let oldSocketId = null;
+
+    for (const [sId, m] of room.members.entries()) {
+      if (m.userId === effectiveUserId || (m.name === userName && (m.isAway || sId === socket.id))) {
+        existingMember = m;
+        oldSocketId = sId;
+        break;
+      }
+    }
+
+    if (existingMember) {
+      if (existingMember.disconnectTimer) {
+        clearTimeout(existingMember.disconnectTimer);
+        existingMember.disconnectTimer = null;
+      }
+
+      if (oldSocketId && oldSocketId !== socket.id) {
+        room.members.delete(oldSocketId);
+      }
+
+      existingMember.id = socket.id;
+      existingMember.userId = effectiveUserId;
+      existingMember.name = userName;
+      existingMember.avatar = avatar || existingMember.avatar || 'scout';
+      existingMember.isAway = false;
+
+      if (room.host === oldSocketId) {
+        room.host = socket.id;
+      }
+      room.members.set(socket.id, existingMember);
+
+      // Send authoritative room state directly to reconnecting member
+      socket.emit('room-state', {
+        roomId: room.id,
+        isHost: existingMember.isHost,
+        members: Array.from(room.members.values()).map(cleanMember),
+        playlist: room.playlist,
+        currentMedia: room.currentMedia,
+        currentTime: room.currentTime,
+        isPlaying: room.isPlaying,
+        playbackRate: room.playbackRate,
+        chat: room.chat.slice(-100),
+        subtitles: room.subtitles,
+        isReconnection: true
+      });
+
+      // Notify others that member has resumed active status without chat spam
+      socket.to(roomId).emit('member-status-changed', {
+        member: cleanMember(existingMember),
+        members: Array.from(room.members.values()).map(cleanMember)
+      });
+      return;
+    }
+
+    // New member joining for the first time
     const isHost = room.members.size === 0;
     if (isHost) room.host = socket.id;
 
-    room.members.set(socket.id, {
+    const newMember = {
       id: socket.id,
+      userId: effectiveUserId,
       name: userName,
       avatar: avatar || 'scout',
       isHost,
+      isAway: false,
       joinedAt: Date.now()
-    });
+    };
+    room.members.set(socket.id, newMember);
 
     // Send room state to new member
     socket.emit('room-state', {
       roomId: room.id,
       isHost,
-      members: Array.from(room.members.values()),
+      members: Array.from(room.members.values()).map(cleanMember),
       playlist: room.playlist,
       currentMedia: room.currentMedia,
       currentTime: room.currentTime,
@@ -540,8 +687,8 @@ io.on('connection', (socket) => {
 
     // Notify others
     socket.to(roomId).emit('member-joined', {
-      member: room.members.get(socket.id),
-      members: Array.from(room.members.values())
+      member: cleanMember(newMember),
+      members: Array.from(room.members.values()).map(cleanMember)
     });
 
     // System message
@@ -672,49 +819,62 @@ io.on('connection', (socket) => {
     io.to(to).emit('webrtc-ice-candidate', { from: socket.id, candidate });
   });
 
-  // ---- DISCONNECT ----
+  // ---- DISCONNECT (With 45s Grace Period for Mobile Tab Switching) ----
   socket.on('disconnect', () => {
-    const room = rooms.get(socket.roomId);
+    const roomId = socket.roomId;
+    if (!roomId) return;
+    const room = rooms.get(roomId);
     if (!room) return;
 
-    room.members.delete(socket.id);
+    const member = room.members.get(socket.id);
+    if (!member) return;
 
-    // Transfer host
-    if (room.host === socket.id && room.members.size > 0) {
-      const newHost = room.members.keys().next().value;
-      room.host = newHost;
-      room.members.get(newHost).isHost = true;
-      io.to(newHost).emit('promoted-to-host');
+    // Mark as away/reconnecting
+    member.isAway = true;
+
+    // Notify others in room immediately of away status
+    socket.to(roomId).emit('member-status-changed', {
+      member: cleanMember(member),
+      members: Array.from(room.members.values()).map(cleanMember)
+    });
+
+    // Start 45s grace period timer
+    if (member.disconnectTimer) {
+      clearTimeout(member.disconnectTimer);
     }
 
-    // Clean up empty temporary rooms after 30 minutes (permanently preserve 'cinema' room)
-    if (room.members.size === 0 && socket.roomId && socket.roomId.toLowerCase() !== 'cinema') {
-      const cleanupTimer = setTimeout(() => {
-        const r = rooms.get(socket.roomId);
-        if (r && r.members.size === 0 && socket.roomId.toLowerCase() !== 'cinema') {
-          rooms.delete(socket.roomId);
-          // Clean up uploaded files
-          const roomDir = path.join(uploadsDir, socket.roomId);
-          if (fs.existsSync(roomDir)) {
-            fs.rmSync(roomDir, { recursive: true, force: true });
-          }
-        }
-      }, 30 * 60 * 1000);
-      if (cleanupTimer && cleanupTimer.unref) cleanupTimer.unref();
+    const effectiveUserId = member.userId || socket.id;
+    const effectiveUserName = socket.userName || member.name;
+
+    member.disconnectTimer = setTimeout(() => {
+      finalizeMemberLeave(roomId, effectiveUserId, effectiveUserName);
+    }, 45000);
+
+    if (member.disconnectTimer && member.disconnectTimer.unref) {
+      member.disconnectTimer.unref();
     }
+  });
 
-    const sysMsg = {
-      id: uuidv4(),
-      type: 'system',
-      text: `${socket.userName || 'Someone'} left the room`,
-      timestamp: Date.now()
-    };
-    room.chat.push(sysMsg);
-    io.to(socket.roomId).emit('chat-message', sysMsg);
+  // Explicit deliberate leave (user clicked Leave Room in UI)
+  socket.on('leave-room', () => {
+    if (!socket.roomId) return;
+    finalizeMemberLeave(socket.roomId, socket.userId || socket.id, socket.userName);
+    socket.leave(socket.roomId);
+    socket.roomId = null;
+  });
 
-    socket.to(socket.roomId).emit('member-left', {
-      memberId: socket.id,
-      members: Array.from(room.members.values())
+  // Request room sync on mobile tab resume / wake
+  socket.on('request-room-sync', () => {
+    const room = rooms.get(socket.roomId);
+    if (!room) return;
+    socket.emit('room-sync-update', {
+      currentTime: room.currentTime,
+      isPlaying: room.isPlaying,
+      playbackRate: room.playbackRate,
+      currentMedia: room.currentMedia,
+      subtitles: room.subtitles,
+      members: Array.from(room.members.values()).map(cleanMember),
+      isHost: room.host === socket.id
     });
   });
 });

@@ -162,6 +162,7 @@ class VideoPlayerController {
       this.isPlaying = true;
       this.updatePlayButton();
       this.centerPlayBtn.classList.remove('show');
+      this.removeResumeTapPrompt();
       this.requestWakeLock();
       this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>', 'Play');
       this.showControls();
@@ -402,10 +403,10 @@ class VideoPlayerController {
       }
     });
 
-    // Screen visibility change (re-request wake lock if playing)
+    // Screen visibility change (re-request wake lock and resume video if returning to foreground)
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.isPlaying) {
-        this.requestWakeLock();
+      if (document.visibilityState === 'visible') {
+        this.handleTabResume();
       }
     });
 
@@ -690,6 +691,7 @@ class VideoPlayerController {
     this.currentSpeed = 1;
     this.video.playbackRate = 1;
     this.releaseWakeLock();
+    this.removeResumeTapPrompt();
     if (this.ambientCtx) this.ambientCtx.clearRect(0, 0, 16, 9);
     const speedBadge = document.getElementById('speed-badge');
     if (speedBadge) speedBadge.textContent = '1.0x';
@@ -994,6 +996,50 @@ class VideoPlayerController {
         this.video.playbackRate = rate;
       }
     }
+  }
+
+  // ---- MOBILE APP SWITCH & TAB RESUME ----
+  handleTabResume() {
+    if (this.isPlaying) {
+      this.requestWakeLock();
+    }
+    // If room/player is playing, but video was paused by mobile OS suspension:
+    if (this.video && this.video.src && this.video.paused && this.isPlaying) {
+      const playPromise = this.video.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          this.removeResumeTapPrompt();
+        }).catch(() => {
+          // Autoplay policy prevented immediate unmuted playback
+          this.showResumeTapPrompt();
+        });
+      }
+    }
+  }
+
+  showResumeTapPrompt() {
+    if (document.getElementById('tap-to-resume-overlay') || !this.video.src) return;
+    const prompt = document.createElement('div');
+    prompt.id = 'tap-to-resume-overlay';
+    prompt.className = 'tap-to-resume-overlay';
+    prompt.innerHTML = `
+      <div class="tap-to-resume-pill">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <span>Tap to Resume Video</span>
+      </div>
+    `;
+    this.wrapper.appendChild(prompt);
+    prompt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.video.play().then(() => {
+        this.removeResumeTapPrompt();
+      }).catch(console.warn);
+    });
+  }
+
+  removeResumeTapPrompt() {
+    const el = document.getElementById('tap-to-resume-overlay');
+    if (el) el.remove();
   }
 
   // ---- FULLSCREEN CHAT OVERLAY ----

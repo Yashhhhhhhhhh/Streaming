@@ -698,6 +698,11 @@ html, body {
   border-color: var(--accent-brass);
   box-shadow: 0 0 10px rgba(197, 160, 89, 0.4);
 }
+.member-avatar.away {
+  opacity: 0.55;
+  filter: grayscale(40%);
+  border-style: dashed;
+}
 
 .member-avatar .tooltip {
   position: absolute;

@@ -15,6 +15,15 @@ const themeLabels = {
 };
 let currentThemeIndex = 0;
 
+function getOrCreateUserId() {
+  let id = localStorage.getItem('syncwatch-user-id');
+  if (!id) {
+    id = 'usr_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now().toString(36);
+    localStorage.setItem('syncwatch-user-id', id);
+  }
+  return id;
+}
+
 // ============ INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', () => {
   window.player = new VideoPlayerController();
@@ -58,25 +67,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('join-name').value = savedName;
   }
 
-  // ============ PERMANENT COUPLE CINEMA AUTO-CONNECT ============
+  // ============ PERMANENT COUPLE CINEMA & ROOM AUTO-CONNECT ============
   const urlParams = new URLSearchParams(window.location.search);
   const savedAvatar = localStorage.getItem('syncwatch-avatar') || 'scout';
   const manualLeave = sessionStorage.getItem('syncwatch-manual-leave');
+  const activeRoom = localStorage.getItem('syncwatch-active-room');
+  const requestedRoom = (urlParams.get('room') || activeRoom || '').toLowerCase().trim();
 
   // Drag and drop
   initDragDrop();
 
-  if (urlParams.has('room')) {
-    const requestedRoom = urlParams.get('room').toLowerCase().trim();
-    if (requestedRoom) {
-      if (savedName && !manualLeave) {
-        // Auto-connect when accessing direct room link or bookmark
-        connectToRoom(requestedRoom, savedName, savedAvatar);
-      } else if (!savedName) {
-        // First-time visitor opening the bookmark: prompt once for callsign
-        document.getElementById('join-code').value = requestedRoom;
-        showJoinModal();
-      }
+  if (requestedRoom) {
+    if (savedName && !manualLeave) {
+      // Auto-connect when accessing direct room link, bookmark, or recovering after mobile tab purge
+      connectToRoom(requestedRoom, savedName, savedAvatar);
+    } else if (!savedName) {
+      // First-time visitor opening the bookmark: prompt once for callsign
+      document.getElementById('join-code').value = requestedRoom;
+      showJoinModal();
     }
   }
 });
@@ -167,8 +175,11 @@ function connectToRoom(roomId, userName, avatar) {
   sessionStorage.removeItem('syncwatch-manual-leave');
   if (userName) localStorage.setItem('syncwatch-name', userName);
   if (avatar) localStorage.setItem('syncwatch-avatar', avatar);
+  if (roomId) localStorage.setItem('syncwatch-active-room', roomId);
 
-  window.currentUser = { name: userName, avatar };
+  const userId = getOrCreateUserId();
+
+  window.currentUser = { name: userName, avatar, userId };
   window.currentRoom = roomId;
 
   // Disconnect existing socket to prevent duplicate event handlers
@@ -181,7 +192,7 @@ function connectToRoom(roomId, userName, avatar) {
   window.socket = io({ transports: ['websocket', 'polling'] });
 
   window.socket.on('connect', () => {
-    window.socket.emit('join-room', { roomId, userName, avatar });
+    window.socket.emit('join-room', { roomId, userName, avatar, userId });
   });
 
   // Room state
@@ -248,7 +259,11 @@ function connectToRoom(roomId, userName, avatar) {
 
     // Switch to room page
     showPage('room-page');
-    showToast(`Welcome to room ${state.roomId.toUpperCase()}!`, 'success');
+    if (state.isReconnection) {
+      showToast(`Reconnected to room ${state.roomId.toUpperCase()}!`, 'success');
+    } else {
+      showToast(`Welcome to room ${state.roomId.toUpperCase()}!`, 'success');
+    }
     startPingMeasurement();
   });
 
@@ -324,6 +339,15 @@ function connectToRoom(roomId, userName, avatar) {
     updatePeopleList(members);
   });
 
+  window.socket.on('member-status-changed', ({ member, members }) => {
+    window.roomMembers = members;
+    updateMembersDisplay(members);
+    updatePeopleList(members);
+    if (member && !member.isAway) {
+      player.showNotification(`${member.name} reconnected`);
+    }
+  });
+
   window.socket.on('member-left', ({ memberId, members }) => {
     window.roomMembers = members;
     updateMembersDisplay(members);
@@ -337,6 +361,34 @@ function connectToRoom(roomId, userName, avatar) {
       window.player.video.playbackRate = window.player.currentSpeed;
     }
     showToast('You are now the host!', 'success');
+  });
+
+  // Room state sync update on mobile foregrounding
+  window.socket.on('room-sync-update', (state) => {
+    if (state.members) {
+      window.roomMembers = state.members;
+      updateMembersDisplay(state.members);
+      updatePeopleList(state.members);
+    }
+    if (typeof state.isHost === 'boolean') {
+      window.isHost = state.isHost;
+    }
+    if (state.currentMedia && (!window.currentMedia || window.currentMedia.id !== state.currentMedia.id)) {
+      player.loadMedia(state.currentMedia);
+    }
+    if (typeof state.currentTime === 'number' && !isNaN(state.currentTime)) {
+      if (Math.abs(player.video.currentTime - state.currentTime) > 1.5) {
+        player.video.currentTime = state.currentTime;
+      }
+    }
+    if (state.isPlaying && player.video.paused) {
+      player.handleTabResume();
+    } else if (!state.isPlaying && !player.video.paused) {
+      player.video.pause();
+    }
+    if (state.playbackRate) {
+      player.syncPlaybackRate(state.playbackRate);
+    }
   });
 
   // Local media sync event
@@ -358,19 +410,31 @@ function connectToRoom(roomId, userName, avatar) {
     await voiceChat.handleIceCandidate(from, candidate);
   });
 
-  // ---- ERROR & DISCONNECT ----
+  // ---- ERROR & DISCONNECT (Resilient to Mobile App Switching) ----
   window.socket.on('error', (err) => {
     showToast(err.message || 'An error occurred', 'error');
-    showPage('landing-page');
+    // Note: Do not kick to landing page on socket error so mobile tab switching does not drop room!
+  });
+
+  window.socket.on('connect_error', (err) => {
+    console.warn('[Socket] Connect error:', err?.message);
+    const pill = document.getElementById('sync-status-pill');
+    if (pill && window.currentRoom) {
+      pill.innerHTML = '<span class="status-dot dot-warning"></span><span class="telemetry-text">Connecting...</span>';
+    }
   });
 
   window.socket.on('disconnect', () => {
-    showToast('Disconnected from server', 'error');
+    if (window.currentRoom) {
+      const pill = document.getElementById('sync-status-pill');
+      if (pill) {
+        pill.innerHTML = '<span class="status-dot dot-warning"></span><span class="telemetry-text">Reconnecting...</span>';
+      }
+    }
   });
 
   window.socket.on('reconnect', () => {
-    showToast('Reconnected!', 'success');
-    window.socket.emit('join-room', { roomId, userName, avatar });
+    showToast('Reconnected to room!', 'success');
   });
 }
 
@@ -386,7 +450,9 @@ function enterCinema() {
 
 function leaveRoom() {
   sessionStorage.setItem('syncwatch-manual-leave', 'true');
+  localStorage.removeItem('syncwatch-active-room');
   if (window.socket) {
+    window.socket.emit('leave-room');
     window.socket.disconnect();
     window.socket = null;
   }
@@ -407,6 +473,40 @@ function leaveRoom() {
   showPage('landing-page');
   showToast('Returned to Outpost Hub', 'info');
 }
+
+// ============ MOBILE APP SWITCH & TAB RESUME HANDLERS ============
+function handleAppResume() {
+  if (!window.currentRoom) return;
+
+  // 1. Reconnect socket if severed
+  if (!window.socket || !window.socket.connected) {
+    if (window.socket) {
+      window.socket.connect();
+    } else {
+      const savedName = localStorage.getItem('syncwatch-name');
+      const savedAvatar = localStorage.getItem('syncwatch-avatar') || 'scout';
+      if (savedName) {
+        connectToRoom(window.currentRoom, savedName, savedAvatar);
+      }
+    }
+  } else {
+    // Socket is active: request immediate room state update
+    window.socket.emit('request-room-sync');
+  }
+
+  // 2. Video resume and wake lock
+  if (window.player) {
+    window.player.handleTabResume();
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    handleAppResume();
+  }
+});
+window.addEventListener('pageshow', handleAppResume);
+window.addEventListener('focus', handleAppResume);
 
 // ============ PING & LATENCY MEASUREMENT ============
 let pingInterval = null;
@@ -461,22 +561,24 @@ function showPage(pageId) {
 
 function updateMembersDisplay(members) {
   const container = document.getElementById('members-display');
+  if (!container || !Array.isArray(members)) return;
   container.innerHTML = members.map(m => `
-    <div class="member-avatar ${m.isHost ? 'host' : ''}" title="${escapeHtml(m.name)}">
+    <div class="member-avatar ${m.isHost ? 'host' : ''} ${m.isAway ? 'away' : ''}" title="${escapeHtml(m.name)}${m.isAway ? ' (Away)' : ''}">
       ${typeof getAvatarSvg === 'function' ? getAvatarSvg(m.avatar, 26) : ''}
-      <div class="tooltip">${escapeHtml(m.name)}${m.isHost ? ' (Host)' : ''}</div>
+      <div class="tooltip">${escapeHtml(m.name)}${m.isHost ? ' (Host)' : ''}${m.isAway ? ' [Away]' : ''}</div>
     </div>
   `).join('');
 }
 
 function updatePeopleList(members) {
   const container = document.getElementById('people-list');
+  if (!container || !Array.isArray(members)) return;
   container.innerHTML = members.map(m => `
-    <div class="person-item">
+    <div class="person-item ${m.isAway ? 'away' : ''}">
       <div class="person-avatar">${typeof getAvatarSvg === 'function' ? getAvatarSvg(m.avatar, 30) : ''}</div>
       <div class="person-info">
         <div class="person-name">${escapeHtml(m.name)}</div>
-        <div class="person-role">${m.isHost ? 'Host' : 'Viewer'}</div>
+        <div class="person-role">${m.isHost ? 'Host' : 'Viewer'}${m.isAway ? ' &bull; Away' : ''}</div>
       </div>
       ${m.isHost ? '<span class="host-badge">HOST</span>' : ''}
     </div>
