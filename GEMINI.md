@@ -1,6 +1,6 @@
 # SyncWatch — Project Architecture & Agent Guidelines
 
-## 🎯 Mission & Core Directives
+## [MISSION] Core Directives
 SyncWatch is an ultra-premium, zero-lag synchronized streaming platform designed for long-distance watch parties (films, anime, serials) with studio-grade audio/video fidelity.
 
 - **Zero-Emoji Rule**: 100% SVG vector insignia only. Never inject unicode emojis anywhere in HTML, CSS, JS, or user-facing strings.
@@ -10,22 +10,29 @@ SyncWatch is an ultra-premium, zero-lag synchronized streaming platform designed
 
 ---
 
-## 📂 Codebase File Map
+## [ARCHITECTURE] Codebase File Map
 
 ```
-server.js          - Express + Socket.IO server; handles room state, 206 partial streaming, upload sanitation, and permanent cinema room
+server.js          - Express + Socket.IO server; handles room state, 206 partial streaming, hybrid AI router, and permanent cinema room
 watch.js           - Cloudflare tunnel runner; writes tunnel-status.json, manages processes via taskkill on Windows
+scripts/
+  local-llm-server.py     - OpenAI-compatible FastAPI microserver for local Qwen 2.5 3B with 100% RTX 2050 GPU offload
+  local-llm-cli.py        - One-shot CLI prompt executor with 0 server overhead
+  gpu-diagnostics.py      - Workstation CPU, RAM, and Dual-GPU diagnostic profiler
+  download-coding-model.py - HuggingFace model downloader for Qwen2.5-Coder-3B-Instruct GGUF
+tests/
+  sync-integration.test.js - Automated 9-scenario integration suite verifying WebSockets, drift sync, AI router, and subtitles
 public/
   index.html       - Single-page application DOM; landing page, modals, video player wrapper, telemetry capsule, sidebar
   css/
     themes.css     - Token architecture for 5 AOT themes (Scout, Wall Maria, Rumbling, Coordinate, Recon) in Obsidian Slate Glass
     player.css     - Video player overlay, optical shadow vignette (no backdrop blur), custom controls, subtitles, ambient glow
     app.css        - Global layout, room header, telemetry capsule, media-info-bar, responsive containers
-    chat.css       - Sidebar comms deck, segmented pill tabs, tactical status chips, micro-reaction bar, Gemini AI panel
+    chat.css       - Sidebar comms deck, segmented pill tabs, tactical status chips, micro-reaction bar, Gemini/Local AI panel
     animations.css - Keyframe animations (pulse, float, slide, fade, glow)
   js/
-    app.js         - Room join/create, socket event dispatch, drag & drop media router, Gemini AI companion, theme cycler, sidebar toggle
-    player.js      - Video player engine: drift-sync protocol (2.5s heartbeat), Web Audio 200% booster, wake lock, subtitles, hotkeys
+    app.js         - Room join/create, socket event dispatch, drag & drop media router, Hybrid AI companion, theme cycler, sidebar toggle
+    player.js      - Video player engine: drift-sync protocol (2.5s heartbeat), Web Audio 200% booster, wake lock, ASS/SRT/VTT parser, hotkeys
     chat.js        - Comms controller: Markdown parser, tactical chips, typing indicators, auto-scroll
     voicechat.js   - WebRTC voice comms with ICE candidate buffering and graceful teardown
     particles.js   - Canvas particle engine; auto-pauses when tab is hidden or inside room page
@@ -36,7 +43,7 @@ docs/
 
 ---
 
-## 🎨 Attack on Titan Design System & Themes
+## [DESIGN SYSTEM] Attack on Titan Themes
 
 | Theme Key | Visual Mood | Accents |
 | :--- | :--- | :--- |
@@ -48,7 +55,7 @@ docs/
 
 ---
 
-## ⌨️ Primary Keyboard Shortcuts
+## [CONTROLS] Primary Keyboard Shortcuts
 
 - `Space` / `K`: Play / Pause toggle
 - `Left` / `Right`: Rewind / Fast-forward 10s
@@ -63,7 +70,7 @@ docs/
 
 ---
 
-## 🧪 Verification Standard
+## [VERIFICATION] Verification Standard
 
 Always run before finalizing any changes:
 ```bash

@@ -199,8 +199,9 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
   });
 
   // Clean teardown
-  clientHost.disconnect();
-  clientViewer.disconnect();
+  if (clientHost) clientHost.close();
+  if (clientViewer) clientViewer.close();
   io.close();
+  if (server.closeAllConnections) server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
 });

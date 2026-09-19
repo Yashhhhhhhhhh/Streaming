@@ -640,7 +640,7 @@ io.on('connection', (socket) => {
 
     // Clean up empty temporary rooms after 30 minutes (permanently preserve 'cinema' room)
     if (room.members.size === 0 && socket.roomId && socket.roomId.toLowerCase() !== 'cinema') {
-      setTimeout(() => {
+      const cleanupTimer = setTimeout(() => {
         const r = rooms.get(socket.roomId);
         if (r && r.members.size === 0 && socket.roomId.toLowerCase() !== 'cinema') {
           rooms.delete(socket.roomId);
@@ -651,6 +651,7 @@ io.on('connection', (socket) => {
           }
         }
       }, 30 * 60 * 1000);
+      if (cleanupTimer && cleanupTimer.unref) cleanupTimer.unref();
     }
 
     const sysMsg = {
