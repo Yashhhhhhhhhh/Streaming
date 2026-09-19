@@ -168,6 +168,12 @@ function connectToRoom(roomId, userName, avatar) {
   window.currentUser = { name: userName, avatar };
   window.currentRoom = roomId;
 
+  // Disconnect existing socket to prevent duplicate event handlers
+  if (window.socket) {
+    window.socket.disconnect();
+    window.socket = null;
+  }
+
   // Connect socket
   window.socket = io({ transports: ['websocket', 'polling'] });
 
@@ -196,9 +202,16 @@ function connectToRoom(roomId, userName, avatar) {
       setTimeout(() => {
         player.video.currentTime = state.currentTime;
         if (state.isPlaying) {
-          player.video.play();
+          const p = player.video.play();
+          if (p !== undefined) {
+            p.catch(() => {
+              player.showNotification('Click screen to allow synchronized playback', 'warning');
+            });
+          }
         }
-        player.syncPlaybackRate(state.playbackRate);
+        if (state.playbackRate) {
+          player.syncPlaybackRate(state.playbackRate);
+        }
       }, 500);
     }
 
@@ -299,6 +312,7 @@ function connectToRoom(roomId, userName, avatar) {
   });
 
   window.socket.on('promoted-to-host', () => {
+    window.isHost = true;
     showToast('You are now the host!', 'success');
   });
 
@@ -337,14 +351,35 @@ function connectToRoom(roomId, userName, avatar) {
   });
 }
 
+function enterCinema() {
+  const savedName = localStorage.getItem('syncwatch-name');
+  if (savedName) {
+    connectToRoom('cinema', savedName, localStorage.getItem('syncwatch-avatar') || 'scout');
+  } else {
+    document.getElementById('join-code').value = 'cinema';
+    showJoinModal();
+  }
+}
+
 function leaveRoom() {
   sessionStorage.setItem('syncwatch-manual-leave', 'true');
   if (window.socket) {
     window.socket.disconnect();
     window.socket = null;
   }
-  voiceChat.stop();
+  if (player) {
+    player.reset();
+  }
+  if (voiceChat) {
+    voiceChat.stop();
+  }
   stopPingMeasurement();
+  window.currentRoom = null;
+  window.roomMembers = [];
+  window.isHost = false;
+  if (chat && chat.messages) {
+    chat.messages.innerHTML = '';
+  }
   window.history.replaceState({}, '', '/');
   showPage('landing-page');
   showToast('Returned to Outpost Hub', 'info');

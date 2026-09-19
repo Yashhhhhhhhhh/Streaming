@@ -216,11 +216,14 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
   const fileSize = stat.size;
   const mimeType = mime.lookup(filePath) || 'video/mp4';
 
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Range');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+
   // Handle subtitle files
   const lowerPath = filePath.toLowerCase();
   if (lowerPath.endsWith('.vtt') || lowerPath.endsWith('.srt') || lowerPath.endsWith('.ass') || lowerPath.endsWith('.ssa')) {
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
-    res.setHeader('Access-Control-Allow-Origin', '*');
     
     if (lowerPath.endsWith('.srt')) {
       // Convert SRT to VTT on the fly, strip UTF-8 BOM
@@ -237,10 +240,28 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
   const range = req.headers.range;
   if (range) {
     const parts = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(parts[0], 10);
-    // Optimized chunk size for tunnel streaming: default to 3MB chunks if range end not provided
-    const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunk
-    const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE, fileSize - 1);
+    let start = parseInt(parts[0], 10);
+    let end = parts[1] ? parseInt(parts[1], 10) : undefined;
+
+    if (isNaN(start)) {
+      // Suffix byte range: bytes=-500 (requesting last 500 bytes)
+      const suffix = end || 0;
+      start = Math.max(0, fileSize - suffix);
+      end = fileSize - 1;
+    } else if (isNaN(end) || end === undefined) {
+      // Chunked streaming: default to 3MB chunks if range end not provided
+      const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunk
+      end = Math.min(start + CHUNK_SIZE, fileSize - 1);
+    }
+
+    if (start >= fileSize || start > end) {
+      res.writeHead(416, {
+        'Content-Range': `bytes */${fileSize}`,
+        'Access-Control-Allow-Origin': '*'
+      });
+      return res.end();
+    }
+
     const contentLength = end - start + 1;
 
     res.writeHead(206, {
@@ -248,7 +269,8 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
       'Accept-Ranges': 'bytes',
       'Content-Length': contentLength,
       'Content-Type': mimeType,
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
     });
     fs.createReadStream(filePath, { start, end }).pipe(res);
   } else {
@@ -256,7 +278,8 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
       'Content-Length': fileSize,
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
     });
     fs.createReadStream(filePath).pipe(res);
   }
@@ -457,11 +480,11 @@ io.on('connection', (socket) => {
       io.to(newHost).emit('promoted-to-host');
     }
 
-    // Clean up empty rooms after 30 minutes
-    if (room.members.size === 0) {
+    // Clean up empty temporary rooms after 30 minutes (permanently preserve 'cinema' room)
+    if (room.members.size === 0 && socket.roomId && socket.roomId.toLowerCase() !== 'cinema') {
       setTimeout(() => {
         const r = rooms.get(socket.roomId);
-        if (r && r.members.size === 0) {
+        if (r && r.members.size === 0 && socket.roomId.toLowerCase() !== 'cinema') {
           rooms.delete(socket.roomId);
           // Clean up uploaded files
           const roomDir = path.join(uploadsDir, socket.roomId);
@@ -486,6 +509,14 @@ io.on('connection', (socket) => {
       members: Array.from(room.members.values())
     });
   });
+});
+
+// Global error handling middleware for Multer and API routes
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err) {
+    return res.status(400).json({ error: err.message || 'Upload failed' });
+  }
+  next();
 });
 
 // ============ START SERVER ============

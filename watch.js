@@ -150,7 +150,10 @@ waitForLocalServer(() => {
     shutdown();
   });
 
+  let isShuttingDown = false;
   function shutdown() {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
     console.log('\n[*] Marking stream dormant and shutting down cleanly...');
     try {
       fs.writeFileSync(statusFilePath, JSON.stringify({

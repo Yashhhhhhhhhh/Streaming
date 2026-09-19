@@ -128,6 +128,13 @@ class ParticleSystem {
   }
 
   animate() {
+    // Suspend intensive physics & rendering when tab is hidden or when active page is not landing (e.g. video streaming in room)
+    const landing = document.getElementById('landing-page');
+    if (document.hidden || (landing && !landing.classList.contains('active'))) {
+      this.animationId = requestAnimationFrame(() => this.animate());
+      return;
+    }
+
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     for (let i = 0; i < this.particles.length; i++) {

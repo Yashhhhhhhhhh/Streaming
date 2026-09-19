@@ -164,6 +164,16 @@ class VoiceChatController {
   async acceptOffer(from, offer) {
     const pc = this.createPeerConnection(from);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    if (pc._pendingIce && pc._pendingIce.length > 0) {
+      for (const cand of pc._pendingIce) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (err) {
+          console.warn('Error adding buffered ICE candidate:', err);
+        }
+      }
+      pc._pendingIce = [];
+    }
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -177,13 +187,32 @@ class VoiceChatController {
     const pc = this.peerConnections.get(from);
     if (pc) {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      if (pc._pendingIce && pc._pendingIce.length > 0) {
+        for (const cand of pc._pendingIce) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (err) {
+            console.warn('Error adding buffered ICE candidate:', err);
+          }
+        }
+        pc._pendingIce = [];
+      }
     }
   }
 
   async handleIceCandidate(from, candidate) {
     const pc = this.peerConnections.get(from);
     if (pc) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      if (!pc.remoteDescription) {
+        if (!pc._pendingIce) pc._pendingIce = [];
+        pc._pendingIce.push(candidate);
+      } else {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.warn('Error adding ICE candidate:', err);
+        }
+      }
     }
   }
 
@@ -193,6 +222,7 @@ class VoiceChatController {
     }
 
     const pc = new RTCPeerConnection({ iceServers: this.iceServers });
+    pc._pendingIce = [];
 
     // Add local stream
     if (this.localStream) {
@@ -226,7 +256,7 @@ class VoiceChatController {
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
         this.removePeer(peerId);
       }
     };

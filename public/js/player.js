@@ -392,6 +392,18 @@ class VideoPlayerController {
         this.requestWakeLock();
       }
     });
+
+    // Fullscreen state change
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = !!document.fullscreenElement;
+      const fsBtn = document.getElementById('fullscreen-btn');
+      if (fsBtn) {
+        fsBtn.title = isFs ? 'Exit Fullscreen (Press F)' : 'Fullscreen (Press F)';
+        fsBtn.innerHTML = isFs
+          ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4,14 10,14 10,20"/><polyline points="20,10 14,10 14,4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+          : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,3 21,3 21,9"/><polyline points="9,21 3,21 3,15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+      }
+    });
   }
 
   // ---- MEDIA LOADING ----
@@ -620,7 +632,35 @@ class VideoPlayerController {
   }
 
   toggleTheater() {
-    document.querySelector('.room-layout').classList.toggle('theater');
+    const layout = document.querySelector('.room-layout');
+    if (layout) {
+      const isTheater = layout.classList.toggle('theater');
+      const btn = document.getElementById('theater-btn');
+      if (btn) btn.classList.toggle('active', isTheater);
+    }
+  }
+
+  reset() {
+    this.video.pause();
+    this.video.removeAttribute('src');
+    this.video.load();
+    this.video.classList.remove('visible');
+    if (this.playerEmpty) this.playerEmpty.style.display = '';
+    if (this.npTitle) this.npTitle.textContent = 'Nothing';
+    this.isPlaying = false;
+    this.isSeeking = false;
+    this.currentSpeed = 1;
+    this.video.playbackRate = 1;
+    this.releaseWakeLock();
+    if (this.ambientCtx) this.ambientCtx.clearRect(0, 0, 16, 9);
+    const speedBadge = document.getElementById('speed-badge');
+    if (speedBadge) speedBadge.textContent = '1.0x';
+    const modeBadge = document.getElementById('mode-badge');
+    if (modeBadge) {
+      modeBadge.textContent = 'Ready';
+      modeBadge.className = 'mode-badge';
+    }
+    this.updatePlayButton();
   }
 
   async togglePiP() {
