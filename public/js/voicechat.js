@@ -10,8 +10,14 @@ class VoiceChatController {
     this.iceServers = [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' }
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      { urls: 'stun:stun.services.mozilla.com' }
     ];
+
+    this.audioContext = null;
+    this.analyser = null;
+    this.micVisualizerTimer = null;
   }
 
   async toggle() {
@@ -35,7 +41,10 @@ class VoiceChatController {
 
       this.isActive = true;
       this.btn.classList.add('active');
-      this.btn.title = 'Voice chat (active)';
+      this.btn.title = 'Voice chat (active - click to leave)';
+
+      // Setup audio level visualizer
+      this.startAudioVisualizer();
 
       // Connect to all existing members
       if (window.roomMembers) {
@@ -46,14 +55,56 @@ class VoiceChatController {
         }
       }
 
-      showToast('Voice chat started', 'success');
+      showToast('Voice chat active 🎙️', 'success');
     } catch (err) {
       console.error('Mic access failed:', err);
-      showToast('Could not access microphone', 'error');
+      showToast('Microphone access denied or not available', 'error');
+    }
+  }
+
+  startAudioVisualizer() {
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = this.audioContext.createMediaStreamSource(this.localStream);
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      source.connect(this.analyser);
+
+      const bufferLength = this.analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const checkVolume = () => {
+        if (!this.isActive || !this.analyser) return;
+        this.analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+        const average = sum / bufferLength;
+
+        // Animate voice button glow when speaking
+        if (average > 15) {
+          this.btn.style.boxShadow = `0 0 ${Math.min(25, average)}px var(--accent-primary)`;
+        } else {
+          this.btn.style.boxShadow = '';
+        }
+        this.micVisualizerTimer = requestAnimationFrame(checkVolume);
+      };
+      checkVolume();
+    } catch (e) {
+      console.warn('Audio visualizer unsupported:', e);
     }
   }
 
   stop() {
+    if (this.micVisualizerTimer) {
+      cancelAnimationFrame(this.micVisualizerTimer);
+      this.micVisualizerTimer = null;
+    }
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    this.btn.style.boxShadow = '';
+
     if (this.localStream) {
       this.localStream.getTracks().forEach(t => t.stop());
       this.localStream = null;

@@ -173,6 +173,7 @@ function connectToRoom(roomId, userName, avatar) {
     // Switch to room page
     showPage('room-page');
     showToast(`Welcome to room ${state.roomId.toUpperCase()}!`, 'success');
+    startPingMeasurement();
   });
 
   // ---- SYNC EVENTS ----
@@ -247,6 +248,12 @@ function connectToRoom(roomId, userName, avatar) {
     showToast('You are now the host!', 'success');
   });
 
+  // Local media sync event
+  window.socket.on('member-local-media-loaded', ({ by, filename }) => {
+    showToast(`${by} loaded local copy: ${filename} (0 Bandwidth Sync Active)`, 'success');
+    player.showNotification(`${by} loaded local file`);
+  });
+
   // ---- WEBRTC EVENTS ----
   window.socket.on('webrtc-offer', async ({ from, offer }) => {
     await voiceChat.handleOffer(from, offer);
@@ -282,9 +289,55 @@ function leaveRoom() {
     window.socket = null;
   }
   voiceChat.stop();
+  stopPingMeasurement();
   window.history.replaceState({}, '', '/');
   showPage('landing-page');
   showToast('Left the room', 'info');
+}
+
+// ============ PING & LATENCY MEASUREMENT ============
+let pingInterval = null;
+
+function startPingMeasurement() {
+  stopPingMeasurement();
+  const measure = async () => {
+    if (!window.currentRoom) return;
+    const start = Date.now();
+    try {
+      const res = await fetch('/api/ping');
+      if (res.ok) {
+        const rtt = Date.now() - start;
+        const pingVal = document.getElementById('ping-value');
+        const pingBadge = document.getElementById('ping-badge');
+        if (pingVal) pingVal.textContent = `${rtt} ms`;
+        if (pingBadge) {
+          pingBadge.className = 'ping-badge' + (rtt > 250 ? ' high' : rtt > 100 ? ' med' : '');
+        }
+      }
+    } catch (e) {
+      // Ignore ping error
+    }
+  };
+  measure();
+  pingInterval = setInterval(measure, 4000);
+}
+
+function stopPingMeasurement() {
+  if (pingInterval) {
+    clearInterval(pingInterval);
+    pingInterval = null;
+  }
+}
+
+// ============ LOCAL FILE SELECTION (DUAL LOCAL SYNC) ============
+function handleLocalFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  if (player) {
+    player.loadLocalMedia(file);
+  }
+  input.value = '';
 }
 
 // ============ UI UPDATES ============

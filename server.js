@@ -130,7 +130,12 @@ app.post('/api/room/:roomId/subtitles', upload.single('media'), (req, res) => {
   res.json({ success: true, path: subtitlePath });
 });
 
-// Stream media with range support for seeking
+// Latency ping endpoint
+app.get('/api/ping', (req, res) => {
+  res.json({ pong: Date.now() });
+});
+
+// Stream media with range support for seeking and tunnel chunk optimization
 app.get('/api/stream/:roomId/:filename', (req, res) => {
   const filePath = path.join(uploadsDir, req.params.roomId, req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
@@ -159,13 +164,15 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
   if (range) {
     const parts = range.replace(/bytes=/, '').split('-');
     const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-    const chunkSize = end - start + 1;
+    // Optimized chunk size for tunnel streaming: default to 3MB chunks if range end not provided
+    const CHUNK_SIZE = 3 * 1024 * 1024; // 3MB chunk
+    const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + CHUNK_SIZE, fileSize - 1);
+    const contentLength = end - start + 1;
 
     res.writeHead(206, {
       'Content-Range': `bytes ${start}-${end}/${fileSize}`,
       'Accept-Ranges': 'bytes',
-      'Content-Length': chunkSize,
+      'Content-Length': contentLength,
       'Content-Type': mimeType,
       'Cache-Control': 'no-cache'
     });
@@ -283,6 +290,15 @@ io.on('connection', (socket) => {
   socket.on('time-update', ({ time }) => {
     const room = rooms.get(socket.roomId);
     if (room) room.currentTime = time;
+  });
+
+  // Local media sync event
+  socket.on('local-media-loaded', ({ filename, size }) => {
+    socket.to(socket.roomId).emit('member-local-media-loaded', {
+      by: socket.userName,
+      filename,
+      size
+    });
   });
 
   // Select media from playlist

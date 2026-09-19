@@ -236,7 +236,40 @@ class VideoPlayerController {
     this.playerEmpty.style.display = 'none';
     this.npTitle.textContent = media.filename;
     this.controls.classList.add('visible');
+
+    const modeBadge = document.getElementById('mode-badge');
+    if (modeBadge) {
+      modeBadge.textContent = 'Host Stream';
+      modeBadge.className = 'mode-badge';
+    }
+
     this.showNotification(`Now playing: ${media.filename}`);
+  }
+
+  loadLocalMedia(file) {
+    const objectUrl = URL.createObjectURL(file);
+    this.video.src = objectUrl;
+    this.video.load();
+    this.video.classList.add('visible');
+    this.playerEmpty.style.display = 'none';
+    this.npTitle.textContent = file.name;
+    this.controls.classList.add('visible');
+
+    const modeBadge = document.getElementById('mode-badge');
+    if (modeBadge) {
+      modeBadge.textContent = 'Dual-Local (0 Lag)';
+      modeBadge.className = 'mode-badge dual-local';
+    }
+
+    this.showNotification(`Loaded local file: ${file.name}`);
+    showToast(`Loaded ${file.name} locally (0 Bandwidth / Max 4K Quality)`, 'success');
+
+    if (window.socket) {
+      window.socket.emit('local-media-loaded', {
+        filename: file.name,
+        size: file.size
+      });
+    }
   }
 
   togglePlay() {

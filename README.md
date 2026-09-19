@@ -40,42 +40,43 @@ A premium synchronized watch-together streaming platform. Watch movies, series, 
 - **10GB file support** — Upload large video files
 - **Responsive design** — Works on any screen size
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Watch Together From Anywhere)
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) v18 or higher
-
-### Installation
+### Option A: 1-Click Remote Watch Party (Recommended for Laptop + Remote Partner)
+Simply double-click `start-watch-party.bat` or run:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Yashhhhhhhhhh/Streaming.git
-cd Streaming
-
-# Install dependencies
-npm install
-
-# Start the server
-npm start
+npm run watch
 ```
 
-The app will be available at `http://localhost:3000`
+This single command:
+1. Starts the local video streaming server on `http://localhost:3000` (for you).
+2. Spawns an encrypted, zero-config **Cloudflare Remote Tunnel** giving you a public HTTPS link (e.g. `https://random-id.trycloudflare.com`).
+3. Automatically copies the remote link to your clipboard!
+4. Automatically opens `http://localhost:3000` in your browser.
+5. Just send the copied link to your partner — she opens it on her laptop anywhere in the world and joins instantly!
 
-### Usage
+---
 
-1. **Create a room** — Click "Create Room", enter your name, pick an avatar
-2. **Share the link** — Copy the room code or link and send it to your partner
-3. **Upload a video** — Click upload or drag & drop a video file
-4. **Watch together** — Play, pause, seek — everything stays in sync!
+### Option B: Standard Local Server
+```bash
+npm start
+```
+Runs the server locally at `http://localhost:3000`.
 
-### Watching Remotely
+---
 
-For watching over the internet (not just local network):
-- Deploy to a cloud service (Render, Railway, Heroku, etc.)
-- Or use a tunneling service like [ngrok](https://ngrok.com/) for quick testing:
-  ```bash
-  npx ngrok http 3000
-  ```
+## ⚡ Two Streaming Modes: Zero Compromise Quality
+
+1. **Host Stream Mode**:
+   - You upload a video file from your laptop.
+   - It streams to your partner over the secure tunnel with HTTP 206 range seeking.
+   - 0s local upload transfer for you on localhost, up to 10GB+.
+
+2. **Dual-Local Sync Mode (Zero Bandwidth / Pure 4K 60fps)**:
+   - If both of you have the video file downloaded on your laptops (or shared beforehand via Google Drive/Telegram), both of you click **"Local File"**.
+   - The browser plays the file directly from each laptop's SSD with **0 network bandwidth and 0 buffering**.
+   - The room perfectly synchronizes play, pause, seek, speed, real-time chat, and WebRTC voice chat!
 
 ## 🎹 Keyboard Shortcuts
 

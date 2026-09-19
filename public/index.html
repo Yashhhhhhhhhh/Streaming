@@ -158,7 +158,11 @@
         <div class="header-center">
           <div class="sync-indicator" id="sync-indicator">
             <span class="sync-dot"></span>
-            <span>In Sync</span>
+            <span id="sync-status-text">In Sync</span>
+          </div>
+          <div class="ping-badge" id="ping-badge" title="Roundtrip latency to host">
+            <span class="ping-dot"></span>
+            <span id="ping-value">-- ms</span>
           </div>
         </div>
         <div class="header-right">
@@ -183,12 +187,18 @@
             <!-- Empty state -->
             <div class="player-empty" id="player-empty">
               <div class="empty-icon">🎬</div>
-              <h3>No media loaded</h3>
-              <p>Upload a video to start watching together</p>
-              <label class="btn-primary upload-trigger" for="file-upload-input">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                Upload Video
-              </label>
+              <h3>Ready to Watch Together</h3>
+              <p>Choose how you want to play your movie or anime episode:</p>
+              <div class="empty-action-group">
+                <label class="btn-primary upload-trigger" for="file-upload-input" title="Upload directly from your laptop to stream to your partner">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Host Stream (Upload to Room)
+                </label>
+                <label class="btn-secondary local-trigger" for="local-file-input" title="Both choose the same file locally - 0 bandwidth, pure uncompressed 4K, zero lag">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                  Dual-Local File (Zero Lag / Pure 4K)
+                </label>
+              </div>
             </div>
 
             <!-- Video element -->
@@ -271,9 +281,14 @@
             <div class="now-playing" id="now-playing">
               <span class="np-label">Now Playing:</span>
               <span class="np-title" id="np-title">Nothing</span>
+              <span class="mode-badge" id="mode-badge" title="Streaming mode">Ready</span>
             </div>
             <div class="media-actions">
-              <label class="action-btn" for="file-upload-input" title="Upload media">
+              <label class="action-btn" for="local-file-input" title="Choose local video file (0 bandwidth, perfect 4K/60fps)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                Local File
+              </label>
+              <label class="action-btn" for="file-upload-input" title="Upload media to room">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Upload
               </label>
@@ -353,6 +368,7 @@
 
     <!-- Hidden file inputs -->
     <input type="file" id="file-upload-input" accept="video/*,audio/*" style="display:none" onchange="handleFileUpload(this)">
+    <input type="file" id="local-file-input" accept="video/*,audio/*" style="display:none" onchange="handleLocalFileSelect(this)">
     <input type="file" id="subtitle-upload-input" accept=".srt,.vtt,.ass,.ssa" style="display:none" onchange="handleSubtitleUpload(this)">
 
     <!-- Upload progress overlay -->
