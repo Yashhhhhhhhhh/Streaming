@@ -9,6 +9,11 @@ Useful for offline summaries, test generation, and Antigravity subagent offloadi
 import os
 import sys
 import argparse
+
+# Force dedicated NVIDIA RTX 2050 (Device 0) over integrated AMD Radeon APU
+os.environ.setdefault("GGML_VK_DEVICE", "0")
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+
 from llama_cpp import Llama
 
 DEFAULT_MODEL = os.path.expanduser(r"~\OneDrive\Desktop\Startups\jarvis-native\models\qwen2.5-3b-instruct-q4_k_m.gguf")
@@ -25,7 +30,7 @@ def main():
         print(f"Error: Model not found at {args.model}", file=sys.stderr)
         sys.exit(1)
 
-    llm = Llama(model_path=args.model, n_gpu_layers=-1, n_ctx=2048, verbose=False)
+    llm = Llama(model_path=args.model, n_gpu_layers=-1, n_threads=6, n_ctx=2048, verbose=False)
     messages = [
         {"role": "system", "content": args.system},
         {"role": "user", "content": args.prompt}

@@ -14,7 +14,9 @@
     "pack": "repomix",
     "tokens": "repomix --token-count-tree",
     "llm": "python scripts/local-llm-server.py",
-    "llm:cli": "python scripts/local-llm-cli.py"
+    "llm:cli": "python scripts/local-llm-cli.py",
+    "diag": "python scripts/gpu-diagnostics.py",
+    "model:coder": "python scripts/download-coding-model.py"
   },
   "dependencies": {
     "express": "^4.18.2",

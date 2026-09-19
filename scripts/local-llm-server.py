@@ -12,6 +12,10 @@ import time
 import argparse
 from typing import List, Optional, Dict, Any
 
+# Force dedicated NVIDIA RTX 2050 (Device 0) over integrated AMD Radeon APU
+os.environ.setdefault("GGML_VK_DEVICE", "0")
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+
 try:
     from fastapi import FastAPI, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
@@ -143,6 +147,7 @@ def start_server():
     llm_instance = Llama(
         model_path=active_model_path,
         n_gpu_layers=args.gpu_layers,
+        n_threads=6,
         n_ctx=args.ctx_size,
         verbose=False
     )

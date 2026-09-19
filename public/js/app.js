@@ -790,16 +790,16 @@ function escapeHtml(str) {
 }
 
 // ============ HYBRID AI COMPANION (Local Neural Core + Gemini Cloud) ============
-let localAiStatus = { localAvailable: false, localModel: null, hasServerGeminiKey: false };
+let _localAiStatus = { localAvailable: false, localModel: null, hasServerGeminiKey: false };
 
 async function checkAiStatus() {
   try {
     const res = await fetch('/api/ai/status');
     const data = await res.json();
-    localAiStatus = data;
+    _localAiStatus = data;
     updateAiBadge(data);
     updateAiModalStatus(data);
-  } catch (err) {
+  } catch (_err) {
     updateAiBadge({ localAvailable: false });
     updateAiModalStatus({ localAvailable: false });
   }
