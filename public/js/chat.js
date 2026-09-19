@@ -145,14 +145,11 @@ class ChatController {
   }
 }
 
-// Global instance
-let chat;
-
-// Global functions
-function sendChatMessage() { chat?.sendMessage(); }
+// Global functions (delegated to window controllers)
+function sendChatMessage() { window.chat?.sendMessage(); }
 function sendReaction(emoji) {
   if (window.socket) {
     window.socket.emit('reaction', { emoji });
-    player?.showFloatingReaction(emoji);
+    window.player?.showFloatingReaction(emoji);
   }
 }

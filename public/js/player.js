@@ -99,6 +99,15 @@ class VideoPlayerController {
     });
   }
 
+  resizeAmbientGlow() {
+    if (!this.ambientCanvas || !this.ambientCtx || !this.ambientEnabled) return;
+    if (this.isPlaying && !this.video.paused && this.video.readyState >= 2) {
+      try {
+        this.ambientCtx.drawImage(this.video, 0, 0, 16, 9);
+      } catch (err) {}
+    }
+  }
+
   initFullscreenChatOverlay() {
     let overlay = document.getElementById('fullscreen-chat-overlay');
     if (!overlay) {
@@ -211,6 +220,7 @@ class VideoPlayerController {
     // Dragging seekbar
     let isDragging = false;
     this.progressContainer.addEventListener('mousedown', () => {
+      if (!this.video.src) return;
       isDragging = true;
       this.isSeeking = true;
       this.progressContainer.classList.add('scrubbing');
@@ -486,9 +496,10 @@ class VideoPlayerController {
   }
 
   seekTo(time, broadcast = false) {
-    this.video.currentTime = time;
+    if (!this.video.src || isNaN(time) || !isFinite(time)) return;
+    this.video.currentTime = Math.max(0, time);
     if (broadcast && window.socket) {
-      window.socket.emit('seek', { time });
+      window.socket.emit('seek', { time: this.video.currentTime });
     }
   }
 
@@ -587,8 +598,18 @@ class VideoPlayerController {
       const source = this.audioContext.createMediaElementSource(this.video);
       this.gainNode = this.audioContext.createGain();
       this.gainNode.gain.value = this.audioBoostLevel;
+
+      // Soft-knee peak limiter to eliminate digital clipping at 150%/200%
+      this.limiterNode = this.audioContext.createDynamicsCompressor();
+      this.limiterNode.threshold.value = -3.0; // dB
+      this.limiterNode.knee.value = 6.0;      // dB
+      this.limiterNode.ratio.value = 20.0;    // Brickwall compression
+      this.limiterNode.attack.value = 0.003;  // 3ms fast attack
+      this.limiterNode.release.value = 0.15;  // 150ms transparent release
+
       source.connect(this.gainNode);
-      this.gainNode.connect(this.audioContext.destination);
+      this.gainNode.connect(this.limiterNode);
+      this.limiterNode.connect(this.audioContext.destination);
     } catch (e) {
       console.warn('Audio booster unsupported or restricted:', e);
     }
@@ -608,8 +629,12 @@ class VideoPlayerController {
       this.audioBoostLevel = 1.0;
     }
 
-    if (this.gainNode) {
-      this.gainNode.gain.value = this.audioBoostLevel;
+    // Smooth linear ramp to eliminate digital click/pop artifacts
+    if (this.gainNode && this.audioContext) {
+      const now = this.audioContext.currentTime;
+      this.gainNode.gain.cancelScheduledValues(now);
+      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+      this.gainNode.gain.linearRampToValueAtTime(this.audioBoostLevel, now + 0.08);
     }
 
     const pct = Math.round(this.audioBoostLevel * 100);
@@ -680,7 +705,7 @@ class VideoPlayerController {
 
     // Subtitles cleanup
     this.subtitleOffset = 0;
-    const subOffsetEl = document.getElementById('popover-sub-offset');
+    const subOffsetEl = document.getElementById('sub-delay-badge');
     if (subOffsetEl) subOffsetEl.textContent = '0.0s';
     const subStatusEl = document.getElementById('popover-sub-status');
     if (subStatusEl) subStatusEl.textContent = 'No subtitles active';

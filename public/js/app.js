@@ -300,12 +300,6 @@ function connectToRoom(roomId, userName, avatar) {
     updatePlaylistUI(playlist);
   });
 
-  // Subtitles
-  window.socket.on('subtitles-updated', (path) => {
-    player.loadSubtitles(path);
-    showToast('Subtitles loaded', 'info');
-  });
-
   // ---- CHAT EVENTS ----
   window.socket.on('chat-message', (msg) => {
     chat.addMessage(msg);
@@ -339,6 +333,9 @@ function connectToRoom(roomId, userName, avatar) {
 
   window.socket.on('promoted-to-host', () => {
     window.isHost = true;
+    if (window.player?.video) {
+      window.player.video.playbackRate = window.player.currentSpeed;
+    }
     showToast('You are now the host!', 'success');
   });
 

@@ -285,9 +285,7 @@ class VoiceChatController {
   }
 }
 
-// Global instance
-let voiceChat;
-
+// Global functions (delegated to window.voiceChat)
 function toggleVoiceChat() {
-  voiceChat?.toggle();
+  window.voiceChat?.toggle();
 }

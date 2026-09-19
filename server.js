@@ -94,7 +94,7 @@ getOrCreateRoom('cinema', 'Yash');
 
 // Create room
 app.post('/api/room/create', (req, res) => {
-  const { hostName, customRoomId } = req.body;
+  const { hostName, customRoomId } = req.body || {};
   const roomId = createRoom(hostName, customRoomId);
   res.json({ roomId, success: true });
 });
@@ -308,7 +308,7 @@ app.get('/api/ai/status', async (req, res) => {
 
 // Unified ask endpoint with automatic fallback
 app.post(['/api/ai/ask', '/api/gemini/ask'], async (req, res) => {
-  const { prompt, mediaTitle, apiKey: userKey, provider } = req.body;
+  const { prompt, mediaTitle, apiKey: userKey, provider } = req.body || {};
   const apiKey = userKey || process.env.GEMINI_API_KEY;
 
   if (!prompt || !prompt.trim()) {
@@ -363,6 +363,44 @@ app.post(['/api/ai/ask', '/api/gemini/ask'], async (req, res) => {
   });
 });
 
+function convertAssToVtt(assContent) {
+  const lines = assContent.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').split('\n');
+  const cues = ['WEBVTT\n'];
+  let cueIndex = 1;
+
+  const formatTime = (t) => {
+    const segs = t.split(':');
+    if (segs.length < 3) return t;
+    const hh = segs[0].padStart(2, '0');
+    const mm = segs[1].padStart(2, '0');
+    const parts = segs[2].split('.');
+    const ssPad = parts[0].padStart(2, '0');
+    const mmm = (parts[1] || '00').padEnd(3, '0').slice(0, 3);
+    return `${hh}:${mm}:${ssPad}.${mmm}`;
+  };
+
+  for (const line of lines) {
+    if (!line.startsWith('Dialogue:')) continue;
+    const colonIndex = line.indexOf(':');
+    const csv = line.substring(colonIndex + 1);
+    const parts = csv.split(',');
+    if (parts.length < 10) continue;
+
+    const start = parts[1].trim();
+    const end = parts[2].trim();
+    let text = parts.slice(9).join(',').trim();
+
+    text = text.replace(/\{[^}]+\}/g, '');
+    text = text.replace(/\\N/g, '\n').replace(/\\n/g, '\n');
+    text = text.trim();
+    if (!text) continue;
+
+    cues.push(`${cueIndex++}\n${formatTime(start)} --> ${formatTime(end)}\n${text}\n`);
+  }
+
+  return cues.join('\n');
+}
+
 // Stream media with range support for seeking and tunnel chunk optimization
 app.get('/api/stream/:roomId/:filename', (req, res) => {
   const safeRoomId = path.basename(req.params.roomId);
@@ -384,14 +422,25 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
     res.setHeader('Content-Type', 'text/vtt; charset=utf-8');
     
     if (lowerPath.endsWith('.srt')) {
-      // Convert SRT to VTT on the fly, strip UTF-8 BOM
+      // Convert SRT to VTT on the fly, strip UTF-8 BOM, normalize timestamps
       let srtContent = fs.readFileSync(filePath, 'utf-8');
       srtContent = srtContent.replace(/^\uFEFF/, '');
       const vttContent = 'WEBVTT\n\n' + srtContent
         .replace(/\r\n/g, '\n')
-        .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+        .replace(/(\d{1,2}:\d{2}:\d{2}),(\d{3})/g, (_match, p1, p2) => {
+          const parts = p1.split(':');
+          const hh = parts[0].padStart(2, '0');
+          return `${hh}:${parts[1]}:${parts[2]}.${p2}`;
+        });
       return res.send(vttContent);
     }
+
+    if (lowerPath.endsWith('.ass') || lowerPath.endsWith('.ssa')) {
+      // Convert ASS/SSA to standard WebVTT on the fly
+      const assContent = fs.readFileSync(filePath, 'utf-8');
+      return res.send(convertAssToVtt(assContent));
+    }
+
     return fs.createReadStream(filePath).pipe(res);
   }
 

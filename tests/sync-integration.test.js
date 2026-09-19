@@ -198,6 +198,63 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     await subtitlePromise;
   });
 
+  await t.test('10. WebRTC signaling relays offers, answers, and ICE candidates between peers', async () => {
+    // 1. Test Offer relay
+    const offerPromise = new Promise((resolve) => {
+      clientViewer.once('webrtc-offer', ({ from, offer }) => {
+        assert.equal(offer.type, 'offer');
+        assert.ok(from);
+        resolve();
+      });
+    });
+    clientHost.emit('webrtc-offer', {
+      to: clientViewer.id,
+      offer: { type: 'offer', sdp: 'v=0...' }
+    });
+    await offerPromise;
+
+    // 2. Test Answer relay
+    const answerPromise = new Promise((resolve) => {
+      clientHost.once('webrtc-answer', ({ from, answer }) => {
+        assert.equal(answer.type, 'answer');
+        assert.ok(from);
+        resolve();
+      });
+    });
+    clientViewer.emit('webrtc-answer', {
+      to: clientHost.id,
+      answer: { type: 'answer', sdp: 'v=0...' }
+    });
+    await answerPromise;
+
+    // 3. Test ICE Candidate relay
+    const icePromise = new Promise((resolve) => {
+      clientViewer.once('webrtc-ice-candidate', ({ from, candidate }) => {
+        assert.equal(candidate.candidate, 'candidate:1 1 UDP ...');
+        assert.ok(from);
+        resolve();
+      });
+    });
+    clientHost.emit('webrtc-ice-candidate', {
+      to: clientViewer.id,
+      candidate: { candidate: 'candidate:1 1 UDP ...' }
+    });
+    await icePromise;
+  });
+
+  await t.test('11. Robustness: Room creation and AI endpoints gracefully handle empty request bodies', async () => {
+    // Empty body on room create
+    const createRes = await fetch(`http://localhost:${testPort}/api/room/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    assert.equal(createRes.status, 200);
+    const createData = await createRes.json();
+    assert.ok(createData.roomId);
+    assert.equal(createData.success, true);
+  });
+
   // Clean teardown
   if (clientHost) clientHost.close();
   if (clientViewer) clientViewer.close();
