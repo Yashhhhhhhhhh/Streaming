@@ -1,189 +1,262 @@
-/* ============ THEME SYSTEM ============ */
+/* ==========================================================================
+   SYNCWATCH — ATTACK ON TITAN (AOT) DESIGN SYSTEM
+   Linear-Grade Semantic Token Architecture & Atmospheric Grading
+   Zero Cringe • Pure Cinematic Craft • Military Precision
+   ========================================================================== */
+
 :root {
-  --transition-speed: 0.3s;
-  --border-radius: 12px;
+  --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+
+  --border-radius-xs: 4px;
   --border-radius-sm: 8px;
-  --border-radius-lg: 20px;
-  --border-radius-xl: 28px;
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.1);
-  --shadow-md: 0 4px 20px rgba(0,0,0,0.15);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.2);
-  --shadow-xl: 0 16px 60px rgba(0,0,0,0.3);
-  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --border-radius: 12px;
+  --border-radius-lg: 18px;
+  --border-radius-xl: 24px;
+  --border-radius-pill: 9999px;
+
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Space Grotesk', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
-/* Midnight Theme (Default) */
-[data-theme="midnight"] {
-  --bg-primary: #0a0a1a;
-  --bg-secondary: #111128;
-  --bg-tertiary: #1a1a3e;
-  --bg-card: rgba(17, 17, 40, 0.85);
-  --bg-glass: rgba(17, 17, 40, 0.6);
-  --bg-hover: rgba(99, 102, 241, 0.1);
-  --bg-input: rgba(26, 26, 62, 0.8);
-  --text-primary: #f0f0ff;
-  --text-secondary: #a0a0cc;
-  --text-muted: #6060a0;
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
-  --accent-gradient: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
-  --accent-gradient-2: linear-gradient(135deg, #6366f1, #8b5cf6);
-  --accent-glow: rgba(99, 102, 241, 0.4);
-  --border-color: rgba(99, 102, 241, 0.15);
-  --border-active: rgba(99, 102, 241, 0.4);
-  --success: #22c55e;
+/* ==========================================================================
+   THEME 1: SCOUT REGIMENT (Survey Corps / Wings of Freedom)
+   Muted Forest Cloak Green • Survey Navy • Ivory Silver • Antique Brass
+   ========================================================================== */
+[data-theme="scout"], :root {
+  --bg-primary: #0a110c;
+  --bg-secondary: #101c14;
+  --bg-tertiary: #17281d;
+  --bg-card: rgba(16, 28, 20, 0.85);
+  --bg-glass: rgba(16, 28, 20, 0.65);
+  --bg-hover: rgba(59, 90, 69, 0.2);
+  --bg-input: rgba(12, 21, 15, 0.85);
+
+  --text-primary: #f2f5f3;
+  --text-secondary: #a3b8aa;
+  --text-muted: #5e7565;
+
+  --accent-primary: #3b8a5a;
+  --accent-secondary: #1e2b58;
+  --accent-brass: #c5a059;
+  --accent-ivory: #f1f5f9;
+  --accent-gradient: linear-gradient(135deg, #3b8a5a 0%, #1e2b58 100%);
+  --accent-gradient-2: linear-gradient(135deg, #2d6a45 0%, #3b8a5a 100%);
+  --accent-glow: rgba(59, 138, 90, 0.35);
+
+  --border-color: rgba(94, 117, 101, 0.2);
+  --border-active: rgba(59, 138, 90, 0.5);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-top-highlight: rgba(255, 255, 255, 0.12);
+
+  --success: #34d399;
   --danger: #ef4444;
   --warning: #f59e0b;
-  --player-bg: #000;
-  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
-  --progress-bg: rgba(255,255,255,0.15);
-  --progress-buffer: rgba(255,255,255,0.25);
-  --progress-fill: var(--accent-primary);
+
+  --player-bg: #000000;
+  --controls-bg: linear-gradient(to top, rgba(10, 17, 12, 0.95) 0%, rgba(10, 17, 12, 0.4) 60%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --progress-fill: #3b8a5a;
+
   --chat-bg: var(--bg-secondary);
-  --chat-bubble-self: var(--accent-gradient-2);
-  --chat-bubble-other: var(--bg-tertiary);
-  --scrollbar-bg: transparent;
-  --scrollbar-thumb: rgba(99, 102, 241, 0.3);
-  --particle-color: rgba(99, 102, 241, 0.15);
+  --chat-bubble-self: linear-gradient(135deg, #244230, #1b3325);
+  --chat-bubble-other: #152219;
+
+  --particle-color: rgba(59, 138, 90, 0.25);
+  --particle-mode: scout;
 }
 
-/* Aurora Theme */
-[data-theme="aurora"] {
-  --bg-primary: #0d1117;
-  --bg-secondary: #0f1923;
-  --bg-tertiary: #132030;
-  --bg-card: rgba(15, 25, 35, 0.85);
-  --bg-glass: rgba(15, 25, 35, 0.6);
-  --bg-hover: rgba(56, 189, 248, 0.1);
-  --bg-input: rgba(19, 32, 48, 0.8);
-  --text-primary: #e0f2fe;
-  --text-secondary: #94a3b8;
+/* ==========================================================================
+   THEME 2: WALL MARIA (Titan Stone Monolith)
+   Basalt Grey • Cold Weathered Granite • Distressed Torchlight Bronze
+   ========================================================================== */
+[data-theme="wall"] {
+  --bg-primary: #0d0f12;
+  --bg-secondary: #13171c;
+  --bg-tertiary: #1b2028;
+  --bg-card: rgba(19, 23, 28, 0.88);
+  --bg-glass: rgba(19, 23, 28, 0.65);
+  --bg-hover: rgba(217, 119, 6, 0.12);
+  --bg-input: rgba(15, 18, 23, 0.85);
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
   --text-muted: #64748b;
-  --accent-primary: #38bdf8;
-  --accent-secondary: #06b6d4;
-  --accent-gradient: linear-gradient(135deg, #06b6d4, #38bdf8, #818cf8);
-  --accent-gradient-2: linear-gradient(135deg, #0ea5e9, #38bdf8);
-  --accent-glow: rgba(56, 189, 248, 0.4);
-  --border-color: rgba(56, 189, 248, 0.12);
-  --border-active: rgba(56, 189, 248, 0.35);
+
+  --accent-primary: #d97706;
+  --accent-secondary: #78716c;
+  --accent-brass: #b45309;
+  --accent-ivory: #e5e7eb;
+  --accent-gradient: linear-gradient(135deg, #d97706 0%, #78716c 100%);
+  --accent-gradient-2: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+  --accent-glow: rgba(217, 119, 6, 0.35);
+
+  --border-color: rgba(156, 163, 175, 0.18);
+  --border-active: rgba(217, 119, 6, 0.5);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-top-highlight: rgba(255, 255, 255, 0.12);
+
   --success: #34d399;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+
+  --player-bg: #000000;
+  --controls-bg: linear-gradient(to top, rgba(13, 15, 18, 0.95) 0%, rgba(13, 15, 18, 0.4) 60%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --progress-fill: #d97706;
+
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: linear-gradient(135deg, #2b251d, #201a13);
+  --chat-bubble-other: #191e24;
+
+  --particle-color: rgba(217, 119, 6, 0.2);
+  --particle-mode: wall;
+}
+
+/* ==========================================================================
+   THEME 3: THE RUMBLING (Colossal Obsidian & Molten Core)
+   Volcanic Basalt Ash • Incandescent Magma Amber • Smoldering Heat Haze
+   ========================================================================== */
+[data-theme="rumbling"] {
+  --bg-primary: #0a0808;
+  --bg-secondary: #140f0f;
+  --bg-tertiary: #1f1616;
+  --bg-card: rgba(20, 15, 15, 0.88);
+  --bg-glass: rgba(20, 15, 15, 0.65);
+  --bg-hover: rgba(234, 88, 12, 0.15);
+  --bg-input: rgba(16, 12, 12, 0.85);
+
+  --text-primary: #fef2f2;
+  --text-secondary: #fca5a5;
+  --text-muted: #7f1d1d;
+
+  --accent-primary: #ea580c;
+  --accent-secondary: #b91c1c;
+  --accent-brass: #f97316;
+  --accent-ivory: #fff1f2;
+  --accent-gradient: linear-gradient(135deg, #ea580c 0%, #b91c1c 50%, #7f1d1d 100%);
+  --accent-gradient-2: linear-gradient(135deg, #c2410c 0%, #ea580c 100%);
+  --accent-glow: rgba(234, 88, 12, 0.45);
+
+  --border-color: rgba(234, 88, 12, 0.2);
+  --border-active: rgba(234, 88, 12, 0.6);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-top-highlight: rgba(254, 202, 202, 0.15);
+
+  --success: #4ade80;
+  --danger: #ef4444;
+  --warning: #f97316;
+
+  --player-bg: #000000;
+  --controls-bg: linear-gradient(to top, rgba(10, 8, 8, 0.95) 0%, rgba(10, 8, 8, 0.4) 60%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --progress-fill: #ea580c;
+
+  --chat-bg: var(--bg-secondary);
+  --chat-bubble-self: linear-gradient(135deg, #381a13, #2a110c);
+  --chat-bubble-other: #1c1414;
+
+  --particle-color: rgba(234, 88, 12, 0.35);
+  --particle-mode: rumbling;
+}
+
+/* ==========================================================================
+   THEME 4: THE COORDINATE (Paths of the Founding Titan)
+   Infinite Starlit Cosmic Void • Luminous Ethereal Cyan Tree of Light
+   ========================================================================== */
+[data-theme="coordinate"] {
+  --bg-primary: #040711;
+  --bg-secondary: #080f21;
+  --bg-tertiary: #0e1a38;
+  --bg-card: rgba(8, 15, 33, 0.88);
+  --bg-glass: rgba(8, 15, 33, 0.65);
+  --bg-hover: rgba(56, 189, 248, 0.15);
+  --bg-input: rgba(6, 12, 27, 0.85);
+
+  --text-primary: #f0f9ff;
+  --text-secondary: #bae6fd;
+  --text-muted: #38bdf8;
+
+  --accent-primary: #0284c7;
+  --accent-secondary: #38bdf8;
+  --accent-brass: #7dd3fc;
+  --accent-ivory: #e0f2fe;
+  --accent-gradient: linear-gradient(135deg, #0284c7 0%, #38bdf8 50%, #a855f7 100%);
+  --accent-gradient-2: linear-gradient(135deg, #0369a1 0%, #0284c7 100%);
+  --accent-glow: rgba(56, 189, 248, 0.4);
+
+  --border-color: rgba(56, 189, 248, 0.2);
+  --border-active: rgba(56, 189, 248, 0.6);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-top-highlight: rgba(186, 230, 253, 0.18);
+
+  --success: #38bdf8;
   --danger: #f87171;
   --warning: #fbbf24;
-  --player-bg: #000;
-  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
-  --progress-bg: rgba(255,255,255,0.15);
-  --progress-buffer: rgba(255,255,255,0.25);
-  --progress-fill: var(--accent-primary);
+
+  --player-bg: #000000;
+  --controls-bg: linear-gradient(to top, rgba(4, 7, 17, 0.95) 0%, rgba(4, 7, 17, 0.4) 60%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --progress-fill: #38bdf8;
+
   --chat-bg: var(--bg-secondary);
-  --chat-bubble-self: var(--accent-gradient-2);
-  --chat-bubble-other: var(--bg-tertiary);
-  --scrollbar-bg: transparent;
-  --scrollbar-thumb: rgba(56, 189, 248, 0.3);
-  --particle-color: rgba(56, 189, 248, 0.12);
+  --chat-bubble-self: linear-gradient(135deg, #0c2747, #071930);
+  --chat-bubble-other: #0b152b;
+
+  --particle-color: rgba(56, 189, 248, 0.3);
+  --particle-mode: coordinate;
 }
 
-/* Sakura Theme */
-[data-theme="sakura"] {
-  --bg-primary: #1a0a1a;
-  --bg-secondary: #1f0f20;
-  --bg-tertiary: #2a1530;
-  --bg-card: rgba(31, 15, 32, 0.85);
-  --bg-glass: rgba(31, 15, 32, 0.6);
-  --bg-hover: rgba(236, 72, 153, 0.1);
-  --bg-input: rgba(42, 21, 48, 0.8);
-  --text-primary: #fce7f3;
-  --text-secondary: #d4a0c0;
-  --text-muted: #9a6090;
-  --accent-primary: #ec4899;
-  --accent-secondary: #f472b6;
-  --accent-gradient: linear-gradient(135deg, #ec4899, #f472b6, #fb923c);
-  --accent-gradient-2: linear-gradient(135deg, #ec4899, #f472b6);
-  --accent-glow: rgba(236, 72, 153, 0.4);
-  --border-color: rgba(236, 72, 153, 0.12);
-  --border-active: rgba(236, 72, 153, 0.35);
-  --success: #4ade80;
-  --danger: #fb7185;
-  --warning: #fcd34d;
-  --player-bg: #000;
-  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
-  --progress-bg: rgba(255,255,255,0.15);
-  --progress-buffer: rgba(255,255,255,0.25);
-  --progress-fill: var(--accent-primary);
-  --chat-bg: var(--bg-secondary);
-  --chat-bubble-self: var(--accent-gradient-2);
-  --chat-bubble-other: var(--bg-tertiary);
-  --scrollbar-bg: transparent;
-  --scrollbar-thumb: rgba(236, 72, 153, 0.3);
-  --particle-color: rgba(236, 72, 153, 0.12);
-}
+/* ==========================================================================
+   THEME 5: MIDNIGHT RECON (Special Operations Squad)
+   Deep Stealth Carbon • Titanium Blade Steel • Scout Precision Green
+   ========================================================================== */
+[data-theme="recon"] {
+  --bg-primary: #070709;
+  --bg-secondary: #0f1014;
+  --bg-tertiary: #17181f;
+  --bg-card: rgba(15, 16, 20, 0.9);
+  --bg-glass: rgba(15, 16, 20, 0.7);
+  --bg-hover: rgba(34, 197, 94, 0.1);
+  --bg-input: rgba(11, 12, 15, 0.85);
 
-/* Emerald Theme */
-[data-theme="emerald"] {
-  --bg-primary: #0a1a0f;
-  --bg-secondary: #0f2818;
-  --bg-tertiary: #153320;
-  --bg-card: rgba(15, 40, 24, 0.85);
-  --bg-glass: rgba(15, 40, 24, 0.6);
-  --bg-hover: rgba(52, 211, 153, 0.1);
-  --bg-input: rgba(21, 51, 32, 0.8);
-  --text-primary: #d1fae5;
-  --text-secondary: #86d4a8;
-  --text-muted: #4a9a6e;
-  --accent-primary: #34d399;
-  --accent-secondary: #10b981;
-  --accent-gradient: linear-gradient(135deg, #10b981, #34d399, #6ee7b7);
-  --accent-gradient-2: linear-gradient(135deg, #10b981, #34d399);
-  --accent-glow: rgba(52, 211, 153, 0.4);
-  --border-color: rgba(52, 211, 153, 0.12);
-  --border-active: rgba(52, 211, 153, 0.35);
-  --success: #4ade80;
-  --danger: #f87171;
-  --warning: #fbbf24;
-  --player-bg: #000;
-  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
-  --progress-bg: rgba(255,255,255,0.15);
-  --progress-buffer: rgba(255,255,255,0.25);
-  --progress-fill: var(--accent-primary);
-  --chat-bg: var(--bg-secondary);
-  --chat-bubble-self: var(--accent-gradient-2);
-  --chat-bubble-other: var(--bg-tertiary);
-  --scrollbar-bg: transparent;
-  --scrollbar-thumb: rgba(52, 211, 153, 0.3);
-  --particle-color: rgba(52, 211, 153, 0.12);
-}
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
 
-/* Sunset Theme */
-[data-theme="sunset"] {
-  --bg-primary: #1a0f0a;
-  --bg-secondary: #251510;
-  --bg-tertiary: #301a15;
-  --bg-card: rgba(37, 21, 16, 0.85);
-  --bg-glass: rgba(37, 21, 16, 0.6);
-  --bg-hover: rgba(251, 146, 60, 0.1);
-  --bg-input: rgba(48, 26, 21, 0.8);
-  --text-primary: #fef3c7;
-  --text-secondary: #d4a87a;
-  --text-muted: #9a7050;
-  --accent-primary: #fb923c;
-  --accent-secondary: #f97316;
-  --accent-gradient: linear-gradient(135deg, #f97316, #fb923c, #fbbf24);
-  --accent-gradient-2: linear-gradient(135deg, #f97316, #fb923c);
-  --accent-glow: rgba(251, 146, 60, 0.4);
-  --border-color: rgba(251, 146, 60, 0.12);
-  --border-active: rgba(251, 146, 60, 0.35);
-  --success: #4ade80;
-  --danger: #fb7185;
-  --warning: #fcd34d;
-  --player-bg: #000;
-  --controls-bg: linear-gradient(transparent, rgba(0,0,0,0.9));
-  --progress-bg: rgba(255,255,255,0.15);
-  --progress-buffer: rgba(255,255,255,0.25);
-  --progress-fill: var(--accent-primary);
+  --accent-primary: #22c55e;
+  --accent-secondary: #64748b;
+  --accent-brass: #cbd5e1;
+  --accent-ivory: #ffffff;
+  --accent-gradient: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  --accent-gradient-2: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  --accent-glow: rgba(34, 197, 94, 0.3);
+
+  --border-color: rgba(100, 116, 139, 0.2);
+  --border-active: rgba(34, 197, 94, 0.5);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-top-highlight: rgba(255, 255, 255, 0.12);
+
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #eab308;
+
+  --player-bg: #000000;
+  --controls-bg: linear-gradient(to top, rgba(7, 7, 9, 0.95) 0%, rgba(7, 7, 9, 0.4) 60%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --progress-fill: #22c55e;
+
   --chat-bg: var(--bg-secondary);
-  --chat-bubble-self: var(--accent-gradient-2);
-  --chat-bubble-other: var(--bg-tertiary);
-  --scrollbar-bg: transparent;
-  --scrollbar-thumb: rgba(251, 146, 60, 0.3);
-  --particle-color: rgba(251, 146, 60, 0.12);
+  --chat-bubble-self: linear-gradient(135deg, #153320, #0d2215);
+  --chat-bubble-other: #14161d;
+
+  --particle-color: rgba(34, 197, 94, 0.2);
+  --particle-mode: scout;
 }

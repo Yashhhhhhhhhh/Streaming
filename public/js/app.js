@@ -5,7 +5,14 @@ window.currentUser = null;
 window.roomMembers = [];
 window.currentRoom = null;
 
-const themes = ['midnight', 'aurora', 'sakura', 'emerald', 'sunset'];
+const themes = ['scout', 'wall', 'rumbling', 'coordinate', 'recon'];
+const themeLabels = {
+  scout: 'Scout Regiment',
+  wall: 'Wall Maria',
+  rumbling: 'The Rumbling',
+  coordinate: 'The Coordinate',
+  recon: 'Midnight Recon'
+};
 let currentThemeIndex = 0;
 
 // ============ INITIALIZATION ============
@@ -29,6 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (savedTheme && themes.includes(savedTheme)) {
     currentThemeIndex = themes.indexOf(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
+  } else {
+    document.documentElement.setAttribute('data-theme', 'scout');
+  }
+  if (window.particleSystem) {
+    window.particleSystem.setTheme(document.documentElement.getAttribute('data-theme') || 'scout');
   }
 
   // Load saved name
@@ -584,7 +596,10 @@ function cycleTheme() {
   const theme = themes[currentThemeIndex];
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('syncwatch-theme', theme);
-  showToast(`Theme: ${theme.charAt(0).toUpperCase() + theme.slice(1)}`, 'info');
+  if (window.particleSystem) {
+    window.particleSystem.setTheme(theme);
+  }
+  showToast(`Theme: ${themeLabels[theme] || theme}`, 'info');
 }
 
 // ============ UTILITIES ============

@@ -92,6 +92,31 @@ html, body {
   position: relative;
 }
 
+.scout-crest-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  filter: drop-shadow(0 0 24px var(--accent-glow));
+  animation: logoFloat 4s ease-in-out infinite;
+}
+
+.crest-svg {
+  display: block;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.35s ease;
+}
+
+.scout-crest-hero:hover .crest-svg {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 16px var(--accent-brass));
+}
+
+.crest-svg.mini {
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
 .logo-icon {
   display: inline-block;
   margin-right: 0.3rem;
@@ -164,6 +189,46 @@ html, body {
 
 .action-card:hover .card-glow {
   opacity: 0.05;
+}
+
+.action-card::before,
+.modal-content::before,
+.sidebar-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-top-highlight, rgba(255, 255, 255, 0.12)), transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.action-card:hover::before {
+  background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+}
+
+.card-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--surface-hover, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  color: var(--accent-primary);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.action-card:hover .card-icon-wrapper {
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 24px var(--accent-glow);
+  transform: translateY(-2px) scale(1.08);
 }
 
 .card-icon {
@@ -433,15 +498,38 @@ html, body {
   gap: 0.75rem;
 }
 
+.header-logo-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--border-radius-sm);
+  transition: background var(--transition-fast, 0.2s);
+}
+
+.header-logo-group:hover {
+  background: var(--bg-hover);
+}
+
+.header-logo-group:hover .crest-svg.mini {
+  transform: scale(1.1);
+}
+
 .header-logo {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.1rem;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 2px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   cursor: pointer;
   transition: opacity 0.3s;
 }
 
-.header-logo:hover { opacity: 0.8; }
+.header-logo:hover { opacity: 0.85; }
 
 .room-badge {
   display: flex;
