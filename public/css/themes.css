@@ -23,32 +23,32 @@
 
 /* ==========================================================================
    THEME 1: SCOUT REGIMENT (Survey Corps / Wings of Freedom)
-   Muted Forest Cloak Green • Survey Navy • Ivory Silver • Antique Brass
+   Deep Obsidian Charcoal • Tactical Emerald • Antique Brass • Survey Navy
    ========================================================================== */
 [data-theme="scout"], :root {
-  --bg-primary: #0a110c;
-  --bg-secondary: #101c14;
-  --bg-tertiary: #17281d;
-  --bg-card: rgba(16, 28, 20, 0.85);
-  --bg-glass: rgba(16, 28, 20, 0.65);
-  --bg-hover: rgba(59, 90, 69, 0.2);
-  --bg-input: rgba(12, 21, 15, 0.85);
+  --bg-primary: #080a0c;
+  --bg-secondary: #0d1115;
+  --bg-tertiary: #131920;
+  --bg-card: rgba(13, 17, 21, 0.9);
+  --bg-glass: rgba(13, 17, 21, 0.75);
+  --bg-hover: rgba(34, 197, 94, 0.12);
+  --bg-input: rgba(9, 12, 16, 0.88);
 
-  --text-primary: #f2f5f3;
-  --text-secondary: #a3b8aa;
-  --text-muted: #5e7565;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
 
-  --accent-primary: #3b8a5a;
+  --accent-primary: #22c55e;
   --accent-secondary: #1e2b58;
   --accent-brass: #c5a059;
   --accent-ivory: #f1f5f9;
-  --accent-gradient: linear-gradient(135deg, #3b8a5a 0%, #1e2b58 100%);
-  --accent-gradient-2: linear-gradient(135deg, #2d6a45 0%, #3b8a5a 100%);
-  --accent-glow: rgba(59, 138, 90, 0.35);
+  --accent-gradient: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  --accent-gradient-2: linear-gradient(135deg, #c5a059 0%, #9a7836 100%);
+  --accent-glow: rgba(34, 197, 94, 0.35);
 
-  --border-color: rgba(94, 117, 101, 0.2);
-  --border-active: rgba(59, 138, 90, 0.5);
-  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(34, 197, 94, 0.5);
+  --border-subtle: rgba(255, 255, 255, 0.05);
   --border-top-highlight: rgba(255, 255, 255, 0.12);
 
   --success: #34d399;
@@ -56,16 +56,16 @@
   --warning: #f59e0b;
 
   --player-bg: #000000;
-  --controls-bg: linear-gradient(to top, rgba(10, 17, 12, 0.95) 0%, rgba(10, 17, 12, 0.4) 60%, transparent 100%);
-  --progress-bg: rgba(255, 255, 255, 0.12);
-  --progress-buffer: rgba(255, 255, 255, 0.22);
-  --progress-fill: #3b8a5a;
+  --controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.12) 75%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.14);
+  --progress-buffer: rgba(255, 255, 255, 0.28);
+  --progress-fill: #22c55e;
 
   --chat-bg: var(--bg-secondary);
-  --chat-bubble-self: linear-gradient(135deg, #244230, #1b3325);
-  --chat-bubble-other: #152219;
+  --chat-bubble-self: linear-gradient(135deg, #163821 0%, #0e2616 100%);
+  --chat-bubble-other: rgba(255, 255, 255, 0.05);
 
-  --particle-color: rgba(59, 138, 90, 0.25);
+  --particle-color: rgba(34, 197, 94, 0.25);
   --particle-mode: scout;
 }
 
@@ -104,14 +104,14 @@
   --warning: #f59e0b;
 
   --player-bg: #000000;
-  --controls-bg: linear-gradient(to top, rgba(13, 15, 18, 0.95) 0%, rgba(13, 15, 18, 0.4) 60%, transparent 100%);
-  --progress-bg: rgba(255, 255, 255, 0.12);
-  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.12) 75%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.14);
+  --progress-buffer: rgba(255, 255, 255, 0.28);
   --progress-fill: #d97706;
 
   --chat-bg: var(--bg-secondary);
   --chat-bubble-self: linear-gradient(135deg, #2b251d, #201a13);
-  --chat-bubble-other: #191e24;
+  --chat-bubble-other: rgba(255, 255, 255, 0.05);
 
   --particle-color: rgba(217, 119, 6, 0.2);
   --particle-mode: wall;
@@ -152,14 +152,14 @@
   --warning: #f97316;
 
   --player-bg: #000000;
-  --controls-bg: linear-gradient(to top, rgba(10, 8, 8, 0.95) 0%, rgba(10, 8, 8, 0.4) 60%, transparent 100%);
-  --progress-bg: rgba(255, 255, 255, 0.12);
-  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.12) 75%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.14);
+  --progress-buffer: rgba(255, 255, 255, 0.28);
   --progress-fill: #ea580c;
 
   --chat-bg: var(--bg-secondary);
   --chat-bubble-self: linear-gradient(135deg, #381a13, #2a110c);
-  --chat-bubble-other: #1c1414;
+  --chat-bubble-other: rgba(255, 255, 255, 0.05);
 
   --particle-color: rgba(234, 88, 12, 0.35);
   --particle-mode: rumbling;
@@ -200,14 +200,14 @@
   --warning: #fbbf24;
 
   --player-bg: #000000;
-  --controls-bg: linear-gradient(to top, rgba(4, 7, 17, 0.95) 0%, rgba(4, 7, 17, 0.4) 60%, transparent 100%);
-  --progress-bg: rgba(255, 255, 255, 0.12);
-  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.12) 75%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.14);
+  --progress-buffer: rgba(255, 255, 255, 0.28);
   --progress-fill: #38bdf8;
 
   --chat-bg: var(--bg-secondary);
   --chat-bubble-self: linear-gradient(135deg, #0c2747, #071930);
-  --chat-bubble-other: #0b152b;
+  --chat-bubble-other: rgba(255, 255, 255, 0.05);
 
   --particle-color: rgba(56, 189, 248, 0.3);
   --particle-mode: coordinate;
@@ -248,9 +248,9 @@
   --warning: #eab308;
 
   --player-bg: #000000;
-  --controls-bg: linear-gradient(to top, rgba(7, 7, 9, 0.95) 0%, rgba(7, 7, 9, 0.4) 60%, transparent 100%);
-  --progress-bg: rgba(255, 255, 255, 0.12);
-  --progress-buffer: rgba(255, 255, 255, 0.22);
+  --controls-bg: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.12) 75%, transparent 100%);
+  --progress-bg: rgba(255, 255, 255, 0.14);
+  --progress-buffer: rgba(255, 255, 255, 0.28);
   --progress-fill: #22c55e;
 
   --chat-bg: var(--bg-secondary);

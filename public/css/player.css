@@ -138,50 +138,55 @@
   cursor: none !important;
 }
 
-/* Center play button */
+/* Center play button (sleek translucent glass) */
 .center-play-btn {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
-  width: 76px;
-  height: 76px;
+  transform: translate(-50%, -50%) scale(0.85);
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  border: 1px solid var(--border-color);
-  background: rgba(10, 17, 12, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  color: var(--text-primary);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   opacity: 0;
   pointer-events: none;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+.center-play-btn svg {
+  margin-left: 3px;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
 .center-play-btn.show {
-  opacity: 1;
+  opacity: 0.85;
   transform: translate(-50%, -50%) scale(1);
   pointer-events: auto;
 }
 
 .center-play-btn:hover {
-  background: var(--accent-primary);
+  opacity: 1;
+  background: rgba(34, 197, 94, 0.35);
   border-color: var(--accent-primary);
-  color: #ffffff;
   transform: translate(-50%, -50%) scale(1.08);
-  box-shadow: 0 0 35px var(--accent-glow);
+  box-shadow: 0 0 30px var(--accent-glow), 0 8px 32px rgba(0, 0, 0, 0.7);
 }
 
 /* ============ CONTROLS BAR ============ */
 .controls-bar {
-  background: linear-gradient(to top, rgba(10, 17, 12, 0.96) 0%, rgba(10, 17, 12, 0.75) 60%, transparent 100%);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  padding: 1.25rem 1.25rem 0.85rem;
+  background: var(--controls-bg, linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.5) 50%, rgba(0, 0, 0, 0.12) 75%, transparent 100%));
+  padding: 1.5rem 1.25rem 0.85rem;
   transform: translateY(10px);
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
@@ -676,13 +681,15 @@
 
 /* ============ SUBTITLE STYLING ============ */
 #video-player::cue {
-  background: rgba(0, 0, 0, 0.75);
-  color: white;
-  font-size: 1.1rem;
-  font-family: 'Inter', sans-serif;
-  padding: 0.2em 0.5em;
-  border-radius: 4px;
-  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.78);
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-family: var(--font-primary), -apple-system, sans-serif;
+  font-weight: 600;
+  padding: 0.25em 0.65em;
+  border-radius: 6px;
+  line-height: 1.45;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.85);
 }
 
 /* ============ KEYBOARD SHORTCUTS HINT ============ */

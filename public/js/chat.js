@@ -66,7 +66,16 @@ class ChatController {
   addSystemMessage(text) {
     const el = document.createElement('div');
     el.className = 'chat-msg-system';
-    el.innerHTML = `<span>${this.escapeHtml(text)}</span>`;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isLeave = text.toLowerCase().includes('left');
+    const dotColor = isLeave ? '#ef4444' : '#22c55e';
+    el.innerHTML = `
+      <div class="system-chip">
+        <span class="system-dot" style="background:${dotColor};box-shadow:0 0 6px ${dotColor}"></span>
+        <span class="system-text">${this.escapeHtml(text)}</span>
+        <span class="system-time">${time}</span>
+      </div>
+    `;
     this.messages.appendChild(el);
     this.scrollToBottom();
   }

@@ -360,6 +360,11 @@ class VideoPlayerController {
           e.preventDefault();
           this.cycleAudioBoost();
           break;
+        case 'c':
+        case 'C':
+          e.preventDefault();
+          if (typeof toggleSidebar === 'function') toggleSidebar();
+          break;
         case '[':
           e.preventDefault();
           this.adjustSubtitleDelay(-0.5);
@@ -414,6 +419,7 @@ class VideoPlayerController {
     this.video.classList.add('visible');
     this.playerEmpty.style.display = 'none';
     this.npTitle.textContent = media.filename;
+    this.npTitle.title = media.filename;
     this.controls.classList.add('visible');
 
     const modeBadge = document.getElementById('mode-badge');
@@ -437,6 +443,7 @@ class VideoPlayerController {
     this.video.classList.add('visible');
     this.playerEmpty.style.display = 'none';
     this.npTitle.textContent = file.name;
+    this.npTitle.title = file.name;
     this.controls.classList.add('visible');
 
     const modeBadge = document.getElementById('mode-badge');

@@ -873,3 +873,18 @@ window.addEventListener('beforeunload', (e) => {
     e.returnValue = '';
   }
 });
+
+// ============ SIDEBAR COLLAPSE / EXPAND ============
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const btn = document.getElementById('sidebar-toggle-btn');
+  if (!sidebar) return;
+  const isCollapsed = sidebar.classList.toggle('collapsed');
+  if (btn) btn.classList.toggle('active', !isCollapsed);
+  if (window.player && typeof window.player.resizeAmbientGlow === 'function') {
+    setTimeout(() => window.player.resizeAmbientGlow(), 300);
+  }
+  showToast(isCollapsed ? 'Sidebar collapsed (Press C to expand)' : 'Sidebar expanded', 'info');
+}
+window.toggleSidebar = toggleSidebar;
+
