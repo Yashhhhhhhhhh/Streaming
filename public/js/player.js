@@ -766,8 +766,9 @@ class VideoPlayerController {
 
     const el = document.createElement('div');
     el.className = 'fs-chat-bubble';
+    const avatarHtml = typeof getAvatarSvg === 'function' ? getAvatarSvg(msg.avatar, 24) : '';
     el.innerHTML = `
-      <span class="fs-chat-avatar">${msg.avatar || '👤'}</span>
+      <span class="fs-chat-avatar">${avatarHtml}</span>
       <span class="fs-chat-name">${this.escapeHtml(msg.userName)}:</span>
       <span class="fs-chat-text">${this.escapeHtml(msg.text)}</span>
     `;
@@ -807,7 +808,8 @@ class VideoPlayerController {
   showNotification(text, type = 'info') {
     const el = document.createElement('div');
     el.className = 'player-notification';
-    el.innerHTML = `<span>${type === 'error' ? '⚠️' : 'ℹ️'}</span><span>${text}</span>`;
+    const iconSvg = typeof getToastIconSvg === 'function' ? getToastIconSvg(type) : '';
+    el.innerHTML = `<span class="player-notif-icon">${iconSvg}</span><span>${this.escapeHtml(text)}</span>`;
     this.notifications.appendChild(el);
 
     setTimeout(() => {
@@ -832,10 +834,11 @@ class VideoPlayerController {
     }, 800);
   }
 
-  showFloatingReaction(emoji) {
+  showFloatingReaction(reactionKey) {
     const el = document.createElement('div');
     el.className = 'floating-reaction';
-    el.textContent = emoji;
+    const svgHtml = typeof getReactionSvg === 'function' ? getReactionSvg(reactionKey, 38) : '';
+    el.innerHTML = svgHtml;
     el.style.left = (20 + Math.random() * 60) + '%';
     this.floatingReactions.appendChild(el);
     setTimeout(() => el.remove(), 2200);

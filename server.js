@@ -275,7 +275,7 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     socket.roomId = roomId;
     socket.userName = userName;
-    socket.avatar = avatar || '👤';
+    socket.avatar = avatar || 'scout';
 
     const isHost = room.members.size === 0;
     if (isHost) room.host = socket.id;
@@ -283,7 +283,7 @@ io.on('connection', (socket) => {
     room.members.set(socket.id, {
       id: socket.id,
       name: userName,
-      avatar: avatar || '👤',
+      avatar: avatar || 'scout',
       isHost,
       joinedAt: Date.now()
     });
@@ -485,5 +485,5 @@ io.on('connection', (socket) => {
 // ============ START SERVER ============
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`\n🎬 SyncWatch is running at http://localhost:${PORT}\n`);
+  console.log(`\n[SyncWatch] Server active at http://localhost:${PORT}\n`);
 });

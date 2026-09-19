@@ -48,8 +48,10 @@ class ChatController {
 
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    const avatarHtml = typeof getAvatarSvg === 'function' ? getAvatarSvg(msg.avatar, 28) : '';
+
     el.innerHTML = `
-      <div class="chat-msg-avatar">${msg.avatar || '👤'}</div>
+      <div class="chat-msg-avatar">${avatarHtml}</div>
       <div class="chat-msg-bubble">
         <div class="chat-msg-name">${this.escapeHtml(msg.userName)}</div>
         <div class="chat-msg-text">${this.formatMessage(msg.text)}</div>

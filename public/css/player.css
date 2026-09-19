@@ -642,8 +642,12 @@
 
 .floating-reaction {
   position: absolute;
-  font-size: 2rem;
-  animation: floatReaction 2s ease-out forwards;
+  pointer-events: none;
+  animation: floatReaction 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 16px rgba(197, 160, 89, 0.45));
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ============ SUBTITLE STYLING ============ */
@@ -716,6 +720,20 @@
   transform: translateY(-10px);
 }
 
-.fs-chat-avatar { font-size: 1.1rem; }
+.fs-chat-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}
 .fs-chat-name { font-weight: 700; color: var(--accent-primary); font-size: 0.8rem; }
 .fs-chat-text { font-weight: 500; }
+
+.player-notif-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  vertical-align: middle;
+}

@@ -55,7 +55,7 @@ class VoiceChatController {
         }
       }
 
-      showToast('Voice chat active 🎙️', 'success');
+      showToast('Voice communications active', 'success');
     } catch (err) {
       console.error('Mic access failed:', err);
       showToast('Microphone access denied or not available', 'error');

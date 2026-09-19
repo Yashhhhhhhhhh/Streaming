@@ -25,17 +25,17 @@ function getCloudflaredPath() {
 
 const cloudflaredBin = getCloudflaredPath();
 if (!cloudflaredBin) {
-  console.error('\n❌ Error: cloudflared is not installed or not in PATH.');
+  console.error('\n[!] Error: cloudflared is not installed or not in PATH.');
   console.error('Install via winget: winget install Cloudflare.cloudflared\n');
   process.exit(1);
 }
 
 console.log('\n============================================================');
-console.log('🎬 SyncWatch — Starting Watch Party Server & Remote Tunnel');
+console.log('[SyncWatch] Starting Watch Party Server & Remote Tunnel');
 console.log('============================================================\n');
 
 // 1. Start Node.js Server
-console.log('🚀 [1/3] Launching local streaming server on port 3000...');
+console.log('[1/3] Launching local streaming server on port 3000...');
 const serverProcess = spawn('node', ['server.js'], {
   cwd: __dirname,
   stdio: ['inherit', 'pipe', 'pipe']
@@ -43,8 +43,8 @@ const serverProcess = spawn('node', ['server.js'], {
 
 serverProcess.stdout.on('data', (data) => {
   const str = data.toString();
-  if (str.includes('SyncWatch is running')) {
-    console.log('   ✅ Local server ready at http://localhost:3000');
+  if (str.includes('Server active')) {
+    console.log('   [+] Local server ready at http://localhost:3000');
   }
 });
 
@@ -67,8 +67,8 @@ function waitForLocalServer(callback) {
 }
 
 waitForLocalServer(() => {
-  console.log('\n🌐 [2/3] Establishing secure Cloudflare Remote Tunnel...');
-  console.log('   (Free, encrypted HTTPS edge connection for your partner)\n');
+  console.log('\n[2/3] Establishing secure Cloudflare Remote Tunnel...');
+  console.log('   (Encrypted HTTPS edge connection for your partner)\n');
 
   const tunnelProcess = spawn(cloudflaredBin, ['tunnel', '--url', 'http://localhost:3000'], {
     stdio: ['ignore', 'pipe', 'pipe']
@@ -94,17 +94,17 @@ waitForLocalServer(() => {
       }
 
       console.log('============================================================');
-      console.log('🎉 YOUR WATCH PARTY IS READY TO STREAM!');
+      console.log('[READY] YOUR WATCH PARTY IS READY TO STREAM');
       console.log('============================================================');
-      console.log(`\n💻 FOR YOU (Host on this Laptop):`);
-      console.log(`   👉 http://localhost:3000`);
-      console.log(`\n💖 FOR YOUR GIRLFRIEND / PARTNER (Anywhere in the world):`);
-      console.log(`   👉 ${tunnelUrl}`);
-      console.log(`\n📋 (Remote link has been automatically copied to your clipboard!)`);
-      console.log('\n📌 Tips for Best Experience:');
-      console.log('   • Upload movies directly on your laptop (0s local transfer, up to 10GB+)');
-      console.log('   • Or use "Dual-Local File Sync" if both of you have the file for 0-bandwidth 4K');
-      console.log('   • WebRTC voice chat works over HTTPS automatically');
+      console.log(`\n[HOST] FOR YOU (This Laptop):`);
+      console.log(`   -> http://localhost:3000`);
+      console.log(`\n[GUEST] FOR YOUR PARTNER (Remote / Anywhere):`);
+      console.log(`   -> ${tunnelUrl}`);
+      console.log(`\n[CLIPBOARD] Remote link has been automatically copied!`);
+      console.log('\n[OPTIMAL USAGE]');
+      console.log('   * Upload movies directly on your laptop (0s local transfer, up to 10GB+)');
+      console.log('   * Or use "Dual-Local File Sync" if both of you have the file for zero-bandwidth 4K');
+      console.log('   * WebRTC voice chat works over HTTPS automatically');
       console.log('\nPress Ctrl+C at any time to stop the server and tunnel cleanly.\n');
 
       // Auto-open browser for the host
@@ -121,12 +121,12 @@ waitForLocalServer(() => {
   tunnelProcess.stderr.on('data', handleTunnelOutput);
 
   tunnelProcess.on('close', (code) => {
-    console.log(`\n⚠️ Tunnel closed (code ${code}).`);
+    console.log(`\n[!] Tunnel closed (code ${code}).`);
     shutdown();
   });
 
   function shutdown() {
-    console.log('\n🛑 Shutting down server and tunnel cleanly...');
+    console.log('\n[*] Shutting down server and tunnel cleanly...');
     try {
       if (process.platform === 'win32' && tunnelProcess.pid) {
         execSync(`taskkill /pid ${tunnelProcess.pid} /T /F`, { stdio: 'ignore' });

@@ -21,7 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
   chat = new ChatController();
   voiceChat = new VoiceChatController();
 
-  // Avatar picker logic
+  // Populate avatar pickers with bespoke SVG insignia
+  document.querySelectorAll('.avatar-btn').forEach(btn => {
+    const key = btn.dataset.avatar;
+    if (key && typeof getAvatarSvg === 'function') {
+      btn.innerHTML = getAvatarSvg(key, 28);
+    }
+  });
+
+  // Avatar picker selection logic
   document.querySelectorAll('.avatar-picker').forEach(picker => {
     picker.addEventListener('click', (e) => {
       const btn = e.target.closest('.avatar-btn');
@@ -96,7 +104,7 @@ async function createRoom() {
     return;
   }
 
-  const avatar = document.querySelector('#create-avatars .avatar-btn.selected')?.dataset.avatar || '😊';
+  const avatar = document.querySelector('#create-avatars .avatar-btn.selected')?.dataset.avatar || 'scout';
 
   try {
     const res = await fetch('/api/room/create', {
@@ -135,7 +143,7 @@ async function joinRoom() {
     return;
   }
 
-  const avatar = document.querySelector('#join-avatars .avatar-btn.selected')?.dataset.avatar || '🥰';
+  const avatar = document.querySelector('#join-avatars .avatar-btn.selected')?.dataset.avatar || 'blades';
 
   localStorage.setItem('syncwatch-name', name);
   closeModal(document.getElementById('join-modal'));
@@ -380,9 +388,9 @@ function showPage(pageId) {
 function updateMembersDisplay(members) {
   const container = document.getElementById('members-display');
   container.innerHTML = members.map(m => `
-    <div class="member-avatar ${m.isHost ? 'host' : ''}" title="${m.name}">
-      ${m.avatar || '👤'}
-      <div class="tooltip">${m.name}${m.isHost ? ' (Host)' : ''}</div>
+    <div class="member-avatar ${m.isHost ? 'host' : ''}" title="${escapeHtml(m.name)}">
+      ${typeof getAvatarSvg === 'function' ? getAvatarSvg(m.avatar, 26) : ''}
+      <div class="tooltip">${escapeHtml(m.name)}${m.isHost ? ' (Host)' : ''}</div>
     </div>
   `).join('');
 }
@@ -391,7 +399,7 @@ function updatePeopleList(members) {
   const container = document.getElementById('people-list');
   container.innerHTML = members.map(m => `
     <div class="person-item">
-      <div class="person-avatar">${m.avatar || '👤'}</div>
+      <div class="person-avatar">${typeof getAvatarSvg === 'function' ? getAvatarSvg(m.avatar, 30) : ''}</div>
       <div class="person-info">
         <div class="person-name">${escapeHtml(m.name)}</div>
         <div class="person-role">${m.isHost ? 'Host' : 'Viewer'}</div>
@@ -416,7 +424,9 @@ function updatePlaylistUI(playlist) {
 
   container.innerHTML = playlist.map(item => `
     <div class="playlist-item ${window.currentMedia?.id === item.id ? 'active' : ''}" onclick="selectMedia('${item.id}')">
-      <div class="playlist-item-icon">🎬</div>
+      <div class="playlist-item-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+      </div>
       <div class="playlist-item-info">
         <div class="playlist-item-name">${escapeHtml(item.filename)}</div>
         <div class="playlist-item-size">${formatFileSize(item.size)}</div>
@@ -622,12 +632,12 @@ function copyRoomCode() {
 
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
-  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const iconSvg = typeof getToastIconSvg === 'function' ? getToastIconSvg(type) : '';
 
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   toast.innerHTML = `
-    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-icon">${iconSvg}</span>
     <span class="toast-message">${message}</span>
   `;
 
@@ -676,7 +686,7 @@ async function askGeminiCompanion() {
   // Render thinking bubble
   const aiEl = document.createElement('div');
   aiEl.className = 'gemini-msg ai';
-  aiEl.innerHTML = `<div class="gemini-bubble ai thinking">Thinking... 🎬</div>`;
+  aiEl.innerHTML = `<div class="gemini-bubble ai thinking">Querying tactical database...</div>`;
   msgList.appendChild(aiEl);
   msgList.scrollTop = msgList.scrollHeight;
 
@@ -717,7 +727,7 @@ function saveGeminiApiKey() {
     const val = keyInput.value.trim();
     if (val) {
       localStorage.setItem('gemini-api-key', val);
-      showToast('Gemini API key saved! 🤖', 'success');
+      showToast('Gemini intelligence key saved', 'success');
       keyInput.value = '';
       closeModal(document.getElementById('gemini-key-modal'));
     }
