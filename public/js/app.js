@@ -789,7 +789,85 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// ============ GEMINI AI COMPANION (/gemini-live-api-dev) ============
+// ============ HYBRID AI COMPANION (Local Neural Core + Gemini Cloud) ============
+let localAiStatus = { localAvailable: false, localModel: null, hasServerGeminiKey: false };
+
+async function checkAiStatus() {
+  try {
+    const res = await fetch('/api/ai/status');
+    const data = await res.json();
+    localAiStatus = data;
+    updateAiBadge(data);
+    updateAiModalStatus(data);
+  } catch (err) {
+    updateAiBadge({ localAvailable: false });
+    updateAiModalStatus({ localAvailable: false });
+  }
+}
+
+function updateAiBadge(status) {
+  const badge = document.getElementById('ai-provider-badge');
+  if (!badge) return;
+
+  const pref = localStorage.getItem('syncwatch-ai-provider') || 'auto';
+  const hasGemini = !!(localStorage.getItem('gemini-api-key') || status.hasServerGeminiKey);
+
+  if (pref === 'local') {
+    if (status.localAvailable) {
+      badge.className = 'ai-provider-badge local';
+      badge.innerHTML = '<span class="pulse-dot"></span> Local Core';
+      badge.title = `Local GPU Core Active (${status.localModel || 'RTX 2050'}) - 0ms latency, zero API tokens`;
+    } else {
+      badge.className = 'ai-provider-badge none';
+      badge.innerHTML = 'Local Offline';
+      badge.title = 'Local Core is offline. Run "npm run llm" to start.';
+    }
+  } else if (pref === 'gemini') {
+    if (hasGemini) {
+      badge.className = 'ai-provider-badge gemini';
+      badge.innerHTML = 'Gemini Cloud';
+      badge.title = 'Google Gemini Cloud Active';
+    } else {
+      badge.className = 'ai-provider-badge none';
+      badge.innerHTML = 'No Key';
+      badge.title = 'Configure Gemini API Key in settings';
+    }
+  } else {
+    // Auto mode
+    if (status.localAvailable) {
+      badge.className = 'ai-provider-badge local';
+      badge.innerHTML = '<span class="pulse-dot"></span> Local Core';
+      badge.title = `Auto-routed to Local GPU Core (${status.localModel || 'RTX 2050'})`;
+    } else if (hasGemini) {
+      badge.className = 'ai-provider-badge gemini';
+      badge.innerHTML = 'Gemini Cloud';
+      badge.title = 'Auto-routed to Gemini Cloud (Local core offline)';
+    } else {
+      badge.className = 'ai-provider-badge none';
+      badge.innerHTML = 'No Provider';
+      badge.title = 'No active AI engine. Click to configure.';
+    }
+  }
+}
+
+function updateAiModalStatus(status) {
+  const pill = document.getElementById('local-core-status-pill');
+  if (!pill) return;
+
+  if (status.localAvailable) {
+    pill.className = 'status-pill online';
+    pill.textContent = 'ONLINE (GPU ACTIVE)';
+  } else {
+    pill.className = 'status-pill offline';
+    pill.textContent = 'OFFLINE (PORT 8000)';
+  }
+}
+
+function saveAiProviderPreference(val) {
+  localStorage.setItem('syncwatch-ai-provider', val);
+  checkAiStatus();
+}
+
 async function askGeminiCompanion() {
   const input = document.getElementById('gemini-input');
   const prompt = input?.value.trim();
@@ -809,39 +887,60 @@ async function askGeminiCompanion() {
   // Render thinking bubble
   const aiEl = document.createElement('div');
   aiEl.className = 'gemini-msg ai';
-  aiEl.innerHTML = `<div class="gemini-bubble ai thinking">Querying tactical database...</div>`;
+  aiEl.innerHTML = '<div class="gemini-bubble ai thinking">Querying tactical database...</div>';
   msgList.appendChild(aiEl);
   msgList.scrollTop = msgList.scrollHeight;
 
   const apiKey = localStorage.getItem('gemini-api-key') || '';
   const currentTitle = document.getElementById('np-title')?.textContent || '';
+  const provider = localStorage.getItem('syncwatch-ai-provider') || 'auto';
 
   try {
-    const res = await fetch('/api/gemini/ask', {
+    const res = await fetch('/api/ai/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, mediaTitle: currentTitle, apiKey })
+      body: JSON.stringify({ prompt, mediaTitle: currentTitle, apiKey, provider })
     });
     const data = await res.json();
     if (data.answer) {
-      aiEl.querySelector('.gemini-bubble').innerHTML = formatMarkdown(data.answer);
+      let perfInfo = '';
+      if (data.provider === 'local' && data.speed) {
+        perfInfo = `<div class="ai-perf-tag">[Local Core: ${data.speed.tokens_per_second} t/s | ${data.speed.elapsed_seconds}s]</div>`;
+      } else if (data.provider === 'gemini') {
+        perfInfo = '<div class="ai-perf-tag">[Gemini Cloud 2.5 Flash]</div>';
+      }
+      aiEl.querySelector('.gemini-bubble').innerHTML = formatMarkdown(data.answer) + perfInfo;
       aiEl.querySelector('.gemini-bubble').classList.remove('thinking');
     } else {
       aiEl.querySelector('.gemini-bubble').innerHTML = `<span style="color:var(--danger)">${escapeHtml(data.error || 'Failed to get response')}</span>`;
       aiEl.querySelector('.gemini-bubble').classList.remove('thinking');
-      if (data.error && data.error.includes('API key')) {
+      if (data.error && (data.error.includes('API key') || data.error.includes('provider') || data.error.includes('offline'))) {
         showGeminiKeyModal();
       }
     }
   } catch (err) {
-    aiEl.querySelector('.gemini-bubble').innerHTML = `<span style="color:var(--danger)">Connection error</span>`;
+    aiEl.querySelector('.gemini-bubble').innerHTML = '<span style="color:var(--danger)">Connection error</span>';
     aiEl.querySelector('.gemini-bubble').classList.remove('thinking');
   }
   msgList.scrollTop = msgList.scrollHeight;
 }
 
 function showGeminiKeyModal() {
-  document.getElementById('gemini-key-modal')?.classList.add('active');
+  const modal = document.getElementById('gemini-key-modal');
+  if (!modal) return;
+  modal.classList.add('active');
+
+  const prefSelect = document.getElementById('ai-provider-select');
+  if (prefSelect) {
+    prefSelect.value = localStorage.getItem('syncwatch-ai-provider') || 'auto';
+  }
+
+  const keyInput = document.getElementById('gemini-api-key-input');
+  if (keyInput) {
+    keyInput.value = localStorage.getItem('gemini-api-key') || '';
+  }
+
+  checkAiStatus();
 }
 
 function saveGeminiApiKey() {
@@ -850,12 +949,23 @@ function saveGeminiApiKey() {
     const val = keyInput.value.trim();
     if (val) {
       localStorage.setItem('gemini-api-key', val);
-      showToast('Gemini intelligence key saved', 'success');
-      keyInput.value = '';
-      closeModal(document.getElementById('gemini-key-modal'));
+      showToast('AI configuration saved', 'success');
+    } else {
+      localStorage.removeItem('gemini-api-key');
+      showToast('AI configuration saved', 'info');
     }
   }
+  const prefSelect = document.getElementById('ai-provider-select');
+  if (prefSelect) {
+    localStorage.setItem('syncwatch-ai-provider', prefSelect.value);
+  }
+  closeModal(document.getElementById('gemini-key-modal'));
+  checkAiStatus();
 }
+
+// Check AI provider status on load and periodically
+setTimeout(checkAiStatus, 1000);
+setInterval(checkAiStatus, 15000);
 
 function formatMarkdown(text) {
   text = escapeHtml(text);

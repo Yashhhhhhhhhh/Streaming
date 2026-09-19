@@ -149,65 +149,218 @@ app.get('/api/ping', (req, res) => {
   res.json({ pong: Date.now() });
 });
 
-// Gemini AI Companion endpoint (/gemini-live-api-dev)
+// ============ HYBRID AI COMPANION (Local Neural Core + Gemini Cloud) ============
 const https = require('https');
-app.post('/api/gemini/ask', (req, res) => {
-  const { prompt, mediaTitle, apiKey: userKey } = req.body;
+
+function checkLocalLlmStatus(port = 8000) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (val) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(val);
+    };
+
+    const timer = setTimeout(() => {
+      try { req.destroy(); } catch {}
+      done({ available: false });
+    }, 350);
+
+    const req = http.get({
+      hostname: '127.0.0.1',
+      port,
+      path: '/health'
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          done({ available: true, model: json.model || 'local-llm', engine: json.engine || 'llama-cpp' });
+        } catch {
+          done({ available: true, model: 'local-llm', engine: 'llama-cpp' });
+        }
+      });
+    });
+
+    req.on('error', () => done({ available: false }));
+  });
+}
+
+function queryLocalLlm({ prompt, mediaTitle, port = 8000, systemInstruction }) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      model: 'qwen2.5-3b-instruct',
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: `[Context: Watching "${mediaTitle || 'Anime / Movie'}"]\n\nQuestion: ${prompt}` }
+      ],
+      temperature: 0.7,
+      max_tokens: 512
+    });
+
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port,
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 30000
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const answer = json.choices?.[0]?.message?.content;
+          if (answer) {
+            resolve({ answer, model: json.model || 'qwen2.5-3b-instruct', speed: json.speed });
+          } else {
+            reject(new Error(json.error?.message || 'Empty response from local LLM'));
+          }
+        } catch {
+          reject(new Error('Failed to parse local LLM response'));
+        }
+      });
+    });
+
+    req.on('error', (e) => reject(new Error('Local LLM connection error: ' + e.message)));
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Local LLM request timed out'));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+function queryGemini({ prompt, mediaTitle, apiKey, systemInstruction }) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: `[Context: Watching "${mediaTitle || 'Anime / Movie'}"]\n\nQuestion: ${prompt}` }
+          ]
+        }
+      ],
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      }
+    });
+
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      port: 443,
+      path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 20000
+    };
+
+    const gReq = https.request(options, (gRes) => {
+      let body = '';
+      gRes.on('data', (d) => body += d);
+      gRes.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+            resolve({ answer: data.candidates[0].content.parts[0].text, model: 'gemini-2.5-flash' });
+          } else {
+            reject(new Error(data.error?.message || 'Failed to retrieve response from Gemini'));
+          }
+        } catch {
+          reject(new Error('Error parsing Gemini response'));
+        }
+      });
+    });
+
+    gReq.on('error', (e) => reject(new Error('Connection error to Gemini API: ' + e.message)));
+    gReq.on('timeout', () => {
+      gReq.destroy();
+      reject(new Error('Gemini request timed out'));
+    });
+
+    gReq.write(postData);
+    gReq.end();
+  });
+}
+
+// Status check for available AI providers (Local Neural Core vs Gemini Cloud)
+app.get('/api/ai/status', async (req, res) => {
+  const localStatus = await checkLocalLlmStatus(8000);
+  const hasServerGeminiKey = !!process.env.GEMINI_API_KEY;
+  res.json({
+    localAvailable: localStatus.available,
+    localModel: localStatus.model || null,
+    hasServerGeminiKey,
+    activeRecommendation: localStatus.available ? 'local' : (hasServerGeminiKey ? 'gemini' : 'none')
+  });
+});
+
+// Unified ask endpoint with automatic fallback
+app.post(['/api/ai/ask', '/api/gemini/ask'], async (req, res) => {
+  const { prompt, mediaTitle, apiKey: userKey, provider } = req.body;
   const apiKey = userKey || process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    return res.status(400).json({ error: 'Gemini API key required. Enter your API key in the AI Companion panel.' });
+  if (!prompt || !prompt.trim()) {
+    return res.status(400).json({ error: 'Prompt is required.' });
   }
 
   const systemInstruction = "You are SyncWatch AI, an engaging, knowledgeable, and spoiler-free movie & anime watch companion. You answer questions about characters, lore, plot context, Japanese anime idioms/culture, and cinematic trivia while viewers watch together. Keep answers conversational, helpful, and concise.";
 
-  const postData = JSON.stringify({
-    contents: [
-      {
-        parts: [
-          { text: `[Context: Watching "${mediaTitle || 'Anime / Movie'}"]\n\nQuestion: ${prompt}` }
-        ]
-      }
-    ],
-    systemInstruction: {
-      parts: [{ text: systemInstruction }]
-    }
-  });
+  const preferredProvider = provider || 'auto'; // 'auto' | 'local' | 'gemini'
 
-  const options = {
-    hostname: 'generativelanguage.googleapis.com',
-    port: 443,
-    path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(postData)
-    }
-  };
-
-  const gReq = https.request(options, (gRes) => {
-    let body = '';
-    gRes.on('data', (d) => body += d);
-    gRes.on('end', () => {
+  // If local is explicitly requested or auto-mode with local available:
+  if (preferredProvider === 'local' || preferredProvider === 'auto') {
+    const local = await checkLocalLlmStatus(8000);
+    if (local.available) {
       try {
-        const data = JSON.parse(body);
-        if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-          res.json({ answer: data.candidates[0].content.parts[0].text });
-        } else {
-          res.status(500).json({ error: data.error?.message || 'Failed to retrieve response from Gemini' });
+        const result = await queryLocalLlm({ prompt, mediaTitle, systemInstruction });
+        return res.json({
+          answer: result.answer,
+          provider: 'local',
+          model: result.model,
+          speed: result.speed
+        });
+      } catch (err) {
+        if (preferredProvider === 'local') {
+          return res.status(500).json({ error: err.message });
         }
-      } catch (e) {
-        res.status(500).json({ error: 'Error parsing Gemini response' });
+        // If auto mode, fall through to Gemini below
       }
-    });
-  });
+    } else if (preferredProvider === 'local') {
+      return res.status(503).json({
+        error: 'Local Neural Core is offline. Run "npm run llm" to start local GPU inference.'
+      });
+    }
+  }
 
-  gReq.on('error', (e) => {
-    res.status(500).json({ error: 'Connection error to Gemini API: ' + e.message });
-  });
+  // Fallback to Gemini Cloud
+  if (apiKey) {
+    try {
+      const result = await queryGemini({ prompt, mediaTitle, apiKey, systemInstruction });
+      return res.json({
+        answer: result.answer,
+        provider: 'gemini',
+        model: result.model
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
-  gReq.write(postData);
-  gReq.end();
+  return res.status(400).json({
+    error: 'No active AI intelligence provider. Either start the Local Neural Core ("npm run llm") for free offline AI, or configure your Gemini API Key.'
+  });
 });
 
 // Stream media with range support for seeking and tunnel chunk optimization

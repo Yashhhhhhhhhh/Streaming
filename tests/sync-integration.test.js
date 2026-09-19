@@ -25,8 +25,8 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     clientHost = Client(serverUrl, { transports: ['websocket'] });
     clientViewer = Client(serverUrl, { transports: ['websocket'] });
 
-    await new Promise((resolve) => clientHost.on('connect', resolve));
-    await new Promise((resolve) => clientViewer.on('connect', resolve));
+    await new Promise((resolve) => clientHost.connected ? resolve() : clientHost.once('connect', resolve));
+    await new Promise((resolve) => clientViewer.connected ? resolve() : clientViewer.once('connect', resolve));
 
     // Host joins first
     const hostJoinedPromise = new Promise((resolve) => {
@@ -137,7 +137,7 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
 
   await t.test('6. Permanent couple room sanctuary (cinema room) exists and persists', async () => {
     const cinemaClient = Client(`http://localhost:${testPort}`, { transports: ['websocket'] });
-    await new Promise((resolve) => cinemaClient.on('connect', resolve));
+    await new Promise((resolve) => cinemaClient.connected ? resolve() : cinemaClient.once('connect', resolve));
 
     const cinemaJoined = new Promise((resolve) => {
       cinemaClient.once('room-state', (data) => {
@@ -156,8 +156,39 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     cinemaClient.disconnect();
   });
 
+  await t.test('7. AI Status endpoint returns provider availability schema', async () => {
+    const res = await fetch(`http://localhost:${testPort}/api/ai/status`);
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.ok('localAvailable' in data);
+    assert.ok('hasServerGeminiKey' in data);
+    assert.ok('activeRecommendation' in data);
+  });
+
+  await t.test('8. AI Ask endpoint rejects empty prompt and reports missing provider without crashing', async () => {
+    // 1. Empty prompt rejected
+    const emptyRes = await fetch(`http://localhost:${testPort}/api/ai/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: '' })
+    });
+    assert.equal(emptyRes.status, 400);
+
+    // 2. Unconfigured provider handled cleanly
+    const noKeyRes = await fetch(`http://localhost:${testPort}/api/ai/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Who is the Commander of the Survey Corps?' })
+    });
+    // Will be either 200 (if local server is up) or 400/503 (if offline without key)
+    assert.ok([200, 400, 503].includes(noKeyRes.status));
+    const data = await noKeyRes.json();
+    assert.ok(data.answer || data.error);
+  });
+
   // Clean teardown
   clientHost.disconnect();
   clientViewer.disconnect();
+  io.close();
   await new Promise((resolve) => server.close(resolve));
 });
