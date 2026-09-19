@@ -25,6 +25,9 @@ class VideoPlayerController {
     this.isSeeking = false;
     this.syncLock = false;
     this.hideControlsTimer = null;
+    this.isHoveringControls = false;
+    this.isPopoverOpen = false;
+    this.hudTimer = null;
     this.currentSpeed = 1;
     this.speeds = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
     this.lastVolume = parseFloat(localStorage.getItem('syncwatch-volume') || '1');
@@ -66,7 +69,7 @@ class VideoPlayerController {
     // Video metadata
     this.video.addEventListener('loadedmetadata', () => {
       this.durationEl.textContent = this.formatTime(this.video.duration);
-      this.controls.classList.add('visible');
+      this.showControls();
       this.centerPlayBtn.classList.add('show');
     });
 
@@ -106,6 +109,8 @@ class VideoPlayerController {
       this.updatePlayButton();
       this.centerPlayBtn.classList.remove('show');
       this.requestWakeLock();
+      this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>', 'Play');
+      this.showControls();
     });
 
     // Pause event
@@ -114,6 +119,8 @@ class VideoPlayerController {
       this.updatePlayButton();
       this.centerPlayBtn.classList.add('show');
       this.releaseWakeLock();
+      this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>', 'Pause');
+      this.showControls();
     });
 
     this.video.addEventListener('ended', () => {
@@ -122,6 +129,7 @@ class VideoPlayerController {
       this.centerPlayBtn.classList.add('show');
       this.releaseWakeLock();
       this.showNotification('Video finished');
+      this.showControls();
     });
 
     this.video.addEventListener('waiting', () => {
@@ -137,20 +145,22 @@ class VideoPlayerController {
       this.showNotification(msg, 'error');
     });
 
-    // Progress bar interactions
+    // Progress bar interactions with edge clamping
     this.progressContainer.addEventListener('click', (e) => {
       const rect = this.progressContainer.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
-      const time = pct * this.video.duration;
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const time = pct * (this.video.duration || 0);
       this.seekTo(time, true);
     });
 
     this.progressContainer.addEventListener('mousemove', (e) => {
       const rect = this.progressContainer.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
+      const rawX = e.clientX - rect.left;
+      const clampedX = Math.max(30, Math.min(rect.width - 30, rawX));
+      const pct = Math.max(0, Math.min(1, rawX / rect.width));
       const time = pct * (this.video.duration || 0);
       this.hoverTime.textContent = this.formatTime(time);
-      this.progressHover.style.left = (e.clientX - rect.left) + 'px';
+      this.progressHover.style.left = clampedX + 'px';
     });
 
     // Dragging seekbar
@@ -158,6 +168,7 @@ class VideoPlayerController {
     this.progressContainer.addEventListener('mousedown', () => {
       isDragging = true;
       this.isSeeking = true;
+      this.progressContainer.classList.add('scrubbing');
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -174,6 +185,7 @@ class VideoPlayerController {
       if (isDragging) {
         isDragging = false;
         this.isSeeking = false;
+        this.progressContainer.classList.remove('scrubbing');
         const rect = this.progressContainer.getBoundingClientRect();
         let pct = (e.clientX - rect.left) / rect.width;
         pct = Math.max(0, Math.min(1, pct));
@@ -181,27 +193,44 @@ class VideoPlayerController {
       }
     });
 
-    // Volume slider
+    // Volume slider & dynamic track fill
     this.volumeSlider.addEventListener('input', (e) => {
       this.setVolume(parseFloat(e.target.value));
     });
 
-    // Controls auto-hide on mouse idle
-    this.wrapper.addEventListener('mousemove', () => {
-      this.controls.classList.add('force-show');
-      this.wrapper.style.cursor = 'default';
-      clearTimeout(this.hideControlsTimer);
-      this.hideControlsTimer = setTimeout(() => {
+    // Controls auto-hide lifecycle with active retention guard
+    const controlsBar = this.wrapper.querySelector('.controls-bar');
+    if (controlsBar) {
+      controlsBar.addEventListener('mouseenter', () => {
+        this.isHoveringControls = true;
+        clearTimeout(this.hideControlsTimer);
+      });
+      controlsBar.addEventListener('mouseleave', () => {
+        this.isHoveringControls = false;
         if (this.isPlaying) {
-          this.controls.classList.remove('force-show');
-          this.wrapper.style.cursor = 'none';
+          this.scheduleHideControls();
         }
-      }, 3000);
+      });
+    }
+
+    this.wrapper.addEventListener('mousemove', () => {
+      this.showControls();
     });
 
     this.wrapper.addEventListener('mouseleave', () => {
-      if (this.isPlaying) {
-        this.controls.classList.remove('force-show');
+      if (this.isPlaying && !this.isPopoverOpen) {
+        this.hideControls();
+      }
+    });
+
+    // Click outside to dismiss subtitle popover
+    document.addEventListener('click', (e) => {
+      if (this.isPopoverOpen) {
+        const popover = document.getElementById('subtitles-popover');
+        const trigger = document.getElementById('subtitles-btn');
+        if (popover && !popover.contains(e.target) && (!trigger || !trigger.contains(e.target))) {
+          this.closeSubtitlesPopover();
+        }
       }
     });
 
@@ -243,24 +272,22 @@ class VideoPlayerController {
         case 'J':
           e.preventDefault();
           this.skip(-10);
-          this.showKeyHint('⏪ -10s');
           break;
         case 'ArrowRight':
         case 'l':
         case 'L':
           e.preventDefault();
           this.skip(10);
-          this.showKeyHint('⏩ +10s');
           break;
         case 'ArrowUp':
           e.preventDefault();
-          this.setVolume(Math.min(1, this.video.volume + 0.1));
-          this.showKeyHint(`🔊 ${Math.round(this.video.volume * 100)}%`);
+          this.setVolume(Math.min(1, this.video.volume + 0.05));
+          this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>', `Volume: ${Math.round(this.video.volume * 100)}%`);
           break;
         case 'ArrowDown':
           e.preventDefault();
-          this.setVolume(Math.max(0, this.video.volume - 0.1));
-          this.showKeyHint(`🔉 ${Math.round(this.video.volume * 100)}%`);
+          this.setVolume(Math.max(0, this.video.volume - 0.05));
+          this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>', `Volume: ${Math.round(this.video.volume * 100)}%`);
           break;
         case 'f':
         case 'F':
@@ -383,16 +410,74 @@ class VideoPlayerController {
     if (!this.video.src) return;
     const newTime = Math.max(0, Math.min(this.video.duration || 0, this.video.currentTime + seconds));
     this.seekTo(newTime, true);
+    const sign = seconds > 0 ? '+' : '';
+    const icon = seconds > 0 
+      ? '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23,4 23,10 17,10"/><path d="M20.49 15a9 9 0 11-5.64-8.36L23 10"/></svg>'
+      : '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 105.64-8.36L1 10"/></svg>';
+    this.showCenterHud(icon, `${sign}${seconds}s`);
+  }
+
+  // ---- CONTROLS VISIBILITY LIFECYCLE ----
+  showControls() {
+    this.wrapper.classList.add('controls-visible');
+    this.wrapper.classList.remove('hide-cursor');
+    clearTimeout(this.hideControlsTimer);
+    if (this.isPlaying && !this.isHoveringControls && !this.isPopoverOpen && !this.isSeeking) {
+      this.scheduleHideControls();
+    }
+  }
+
+  scheduleHideControls() {
+    clearTimeout(this.hideControlsTimer);
+    this.hideControlsTimer = setTimeout(() => {
+      if (this.isPlaying && !this.isHoveringControls && !this.isPopoverOpen && !this.isSeeking) {
+        this.hideControls();
+      }
+    }, 2500);
+  }
+
+  hideControls() {
+    this.wrapper.classList.remove('controls-visible');
+    this.wrapper.classList.add('hide-cursor');
+  }
+
+  // ---- CENTRAL TRANSIENT HUD FEEDBACK ----
+  showCenterHud(iconSvg, text) {
+    const hud = document.getElementById('player-hud-flash');
+    const iconWrap = document.getElementById('hud-icon-wrap');
+    const label = document.getElementById('hud-label');
+    if (!hud || !iconWrap || !label) return;
+
+    iconWrap.innerHTML = iconSvg;
+    label.textContent = text;
+    hud.classList.add('active');
+
+    clearTimeout(this.hudTimer);
+    this.hudTimer = setTimeout(() => {
+      hud.classList.remove('active');
+    }, 550);
   }
 
   // ---- VOLUME & AUDIO BOOST ----
   setVolume(val) {
-    this.video.volume = val;
-    this.volumeSlider.value = val;
-    this.updateVolumeIcon();
-    if (val > 0) {
-      this.lastVolume = val;
-      localStorage.setItem('syncwatch-volume', val.toString());
+    const v = Math.max(0, Math.min(1, val));
+    this.video.volume = v;
+    this.volumeSlider.value = v;
+    this.volumeSlider.style.setProperty('--volume-pct', `${Math.round(v * 100)}%`);
+    this.updateVolumeIcon(v);
+    if (v > 0) {
+      this.lastVolume = v;
+      localStorage.setItem('syncwatch-volume', v.toString());
+    }
+  }
+
+  updateVolumeIcon(v = this.video.volume) {
+    const high = this.volumeBtn.querySelector('.icon-vol-high');
+    const muted = this.volumeBtn.querySelector('.icon-vol-muted');
+    if (high && muted) {
+      const isMuted = v === 0;
+      high.style.display = isMuted ? 'none' : 'block';
+      muted.style.display = isMuted ? 'block' : 'none';
     }
   }
 
@@ -400,8 +485,11 @@ class VideoPlayerController {
     if (this.video.volume > 0) {
       this.lastVolume = this.video.volume;
       this.setVolume(0);
+      this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>', 'Muted');
     } else {
-      this.setVolume(this.lastVolume || 0.8);
+      const targetVol = this.lastVolume || 0.8;
+      this.setVolume(targetVol);
+      this.showCenterHud('<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="currentColor"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>', `Volume: ${Math.round(targetVol * 100)}%`);
     }
   }
 
@@ -428,18 +516,24 @@ class VideoPlayerController {
 
     if (this.audioBoostLevel === 1.0) {
       this.audioBoostLevel = 1.5;
-      this.showKeyHint('🔊 Boost: 150%');
     } else if (this.audioBoostLevel === 1.5) {
       this.audioBoostLevel = 2.0;
-      this.showKeyHint('🔥 Boost: 200%');
     } else {
       this.audioBoostLevel = 1.0;
-      this.showKeyHint('🔉 Normal: 100%');
     }
 
     if (this.gainNode) {
       this.gainNode.gain.value = this.audioBoostLevel;
     }
+
+    const pct = Math.round(this.audioBoostLevel * 100);
+    const badge = document.getElementById('boost-badge');
+    const btn = document.getElementById('boost-btn');
+    if (badge) badge.textContent = `${pct}%`;
+    if (btn) btn.classList.toggle('boosted', this.audioBoostLevel > 1.0);
+
+    const boostIcon = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+    this.showCenterHud(boostIcon, `Audio Boost: ${pct}%`);
   }
 
   // ---- SPEED & FULLSCREEN ----
@@ -447,11 +541,13 @@ class VideoPlayerController {
     const idx = this.speeds.indexOf(this.currentSpeed);
     this.currentSpeed = this.speeds[(idx + 1) % this.speeds.length];
     this.video.playbackRate = this.currentSpeed;
-    this.speedBtn.textContent = this.currentSpeed + 'x';
+    const badge = document.getElementById('speed-badge');
+    if (badge) badge.textContent = `${this.currentSpeed}x`;
     if (window.socket) {
       window.socket.emit('playback-rate', { rate: this.currentSpeed });
     }
-    this.showKeyHint(`Speed: ${this.currentSpeed}x`);
+    const speedIcon = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+    this.showCenterHud(speedIcon, `Speed: ${this.currentSpeed}x`);
   }
 
   toggleFullscreen() {
@@ -499,8 +595,8 @@ class VideoPlayerController {
     }
   }
 
-  // ---- SUBTITLES & OFFSET ----
-  loadSubtitles(pathOrBlobUrl) {
+  // ---- SUBTITLES & POPOVER ----
+  loadSubtitles(pathOrBlobUrl, filename = 'Subtitles loaded') {
     const existing = this.video.querySelectorAll('track');
     existing.forEach(t => t.remove());
 
@@ -521,6 +617,9 @@ class VideoPlayerController {
     if (this.video.textTracks.length > 0) {
       this.video.textTracks[0].mode = 'showing';
     }
+
+    const statusEl = document.getElementById('popover-sub-status');
+    if (statusEl) statusEl.textContent = `Active: ${filename}`;
     this.showNotification('Subtitles loaded');
   }
 
@@ -539,14 +638,15 @@ class VideoPlayerController {
 
       const blob = new Blob([vttContent], { type: 'text/vtt' });
       const blobUrl = URL.createObjectURL(blob);
-      this.loadSubtitles(blobUrl);
+      this.loadSubtitles(blobUrl, file.name);
       showToast(`Loaded subtitle: ${file.name}`, 'success');
+      this.closeSubtitlesPopover();
     };
     reader.readAsText(file);
   }
 
   adjustSubtitleDelay(deltaSeconds) {
-    this.subtitleOffset += deltaSeconds;
+    this.subtitleOffset = Math.round((this.subtitleOffset + deltaSeconds) * 10) / 10;
     const track = this.video.textTracks?.[0];
     if (track && track.cues) {
       for (let i = 0; i < track.cues.length; i++) {
@@ -556,7 +656,38 @@ class VideoPlayerController {
       }
     }
     const sign = this.subtitleOffset > 0 ? '+' : '';
-    this.showKeyHint(`Subtitles: ${sign}${this.subtitleOffset.toFixed(1)}s`);
+    const text = `${sign}${this.subtitleOffset.toFixed(1)}s`;
+    const badge = document.getElementById('sub-delay-badge');
+    if (badge) badge.textContent = text;
+    const clockIcon = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+    this.showCenterHud(clockIcon, `Sub Delay: ${text}`);
+  }
+
+  resetSubtitleDelay() {
+    const delta = -this.subtitleOffset;
+    this.adjustSubtitleDelay(delta);
+    this.subtitleOffset = 0;
+    const badge = document.getElementById('sub-delay-badge');
+    if (badge) badge.textContent = '0.0s';
+  }
+
+  toggleSubtitlesPopover(e) {
+    if (e) e.stopPropagation();
+    const popover = document.getElementById('subtitles-popover');
+    if (!popover) return;
+    const isOpen = popover.classList.toggle('open');
+    this.isPopoverOpen = isOpen;
+    if (isOpen) {
+      this.showControls();
+    }
+  }
+
+  closeSubtitlesPopover() {
+    const popover = document.getElementById('subtitles-popover');
+    if (popover) {
+      popover.classList.remove('open');
+      this.isPopoverOpen = false;
+    }
   }
 
   // ---- SYNC PROTOCOL METHODS ----
@@ -738,6 +869,10 @@ function toggleFullscreen() { player?.toggleFullscreen(); }
 function toggleTheater() { player?.toggleTheater(); }
 function togglePiP() { player?.togglePiP(); }
 function cycleAudioBoost() { player?.cycleAudioBoost(); }
+function toggleSubtitlesPopover(e) { player?.toggleSubtitlesPopover(e); }
+function closeSubtitlesPopover() { player?.closeSubtitlesPopover(); }
+function adjustSubtitleDelay(s) { player?.adjustSubtitleDelay(s); }
+function resetSubtitleDelay() { player?.resetSubtitleDelay(); }
 function toggleSubtitlesPanel() {
   const sub = document.getElementById('subtitle-upload-input');
   sub.click();
