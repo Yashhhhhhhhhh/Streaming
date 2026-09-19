@@ -783,10 +783,17 @@ class VideoPlayerController {
       content = content.replace(/^\uFEFF/, ''); // Strip BOM
 
       let vttContent = content;
-      if (file.name.toLowerCase().endsWith('.srt')) {
+      const lower = file.name.toLowerCase();
+      if (lower.endsWith('.srt')) {
         vttContent = 'WEBVTT\n\n' + content
           .replace(/\r\n/g, '\n')
-          .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+          .replace(/(\d{1,2}:\d{2}:\d{2}),(\d{3})/g, (_match, p1, p2) => {
+            const parts = p1.split(':');
+            const hh = parts[0].padStart(2, '0');
+            return `${hh}:${parts[1]}:${parts[2]}.${p2}`;
+          });
+      } else if (lower.endsWith('.ass') || lower.endsWith('.ssa')) {
+        vttContent = this.convertAssToVtt(content);
       }
 
       const blob = new Blob([vttContent], { type: 'text/vtt' });
@@ -796,6 +803,45 @@ class VideoPlayerController {
       this.closeSubtitlesPopover();
     };
     reader.readAsText(file);
+  }
+
+  convertAssToVtt(assContent) {
+    const lines = assContent.replace(/\r\n/g, '\n').split('\n');
+    const cues = ['WEBVTT\n'];
+    let cueIndex = 1;
+
+    const formatTime = (t) => {
+      const segs = t.split(':');
+      if (segs.length < 3) return t;
+      const hh = segs[0].padStart(2, '0');
+      const mm = segs[1].padStart(2, '0');
+      const parts = segs[2].split('.');
+      const ssPad = parts[0].padStart(2, '0');
+      const mmm = (parts[1] || '00').padEnd(3, '0').slice(0, 3);
+      return `${hh}:${mm}:${ssPad}.${mmm}`;
+    };
+
+    for (const line of lines) {
+      if (!line.startsWith('Dialogue:')) continue;
+      const colonIndex = line.indexOf(':');
+      const csv = line.substring(colonIndex + 1);
+      const parts = csv.split(',');
+      if (parts.length < 10) continue;
+
+      const start = parts[1].trim();
+      const end = parts[2].trim();
+      let text = parts.slice(9).join(',').trim();
+
+      // Clean ASS override tags like {\an8}, {\pos(100,200)}, etc.
+      text = text.replace(/\{[^}]+\}/g, '');
+      text = text.replace(/\\N/g, '\n').replace(/\\n/g, '\n');
+      text = text.trim();
+      if (!text) continue;
+
+      cues.push(`${cueIndex++}\n${formatTime(start)} --> ${formatTime(end)}\n${text}\n`);
+    }
+
+    return cues.join('\n');
   }
 
   adjustSubtitleDelay(deltaSeconds) {
@@ -1017,23 +1063,20 @@ class VideoPlayerController {
   }
 }
 
-// Global instance
-let player;
-
-// Global HTML onclick handlers
-function togglePlay() { player?.togglePlay(); }
-function skip(s) { player?.skip(s); }
-function toggleMute() { player?.toggleMute(); }
-function cycleSpeed() { player?.cycleSpeed(); }
-function toggleFullscreen() { player?.toggleFullscreen(); }
-function toggleTheater() { player?.toggleTheater(); }
-function togglePiP() { player?.togglePiP(); }
-function cycleAudioBoost() { player?.cycleAudioBoost(); }
-function toggleSubtitlesPopover(e) { player?.toggleSubtitlesPopover(e); }
-function closeSubtitlesPopover() { player?.closeSubtitlesPopover(); }
-function adjustSubtitleDelay(s) { player?.adjustSubtitleDelay(s); }
-function resetSubtitleDelay() { player?.resetSubtitleDelay(); }
+// Global HTML onclick handlers (delegated to window.player)
+function togglePlay() { window.player?.togglePlay(); }
+function skip(s) { window.player?.skip(s); }
+function toggleMute() { window.player?.toggleMute(); }
+function cycleSpeed() { window.player?.cycleSpeed(); }
+function toggleFullscreen() { window.player?.toggleFullscreen(); }
+function toggleTheater() { window.player?.toggleTheater(); }
+function togglePiP() { window.player?.togglePiP(); }
+function cycleAudioBoost() { window.player?.cycleAudioBoost(); }
+function toggleSubtitlesPopover(e) { window.player?.toggleSubtitlesPopover(e); }
+function closeSubtitlesPopover() { window.player?.closeSubtitlesPopover(); }
+function adjustSubtitleDelay(s) { window.player?.adjustSubtitleDelay(s); }
+function resetSubtitleDelay() { window.player?.resetSubtitleDelay(); }
 function toggleSubtitlesPanel() {
   const sub = document.getElementById('subtitle-upload-input');
-  sub.click();
+  sub?.click();
 }

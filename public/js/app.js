@@ -17,9 +17,9 @@ let currentThemeIndex = 0;
 
 // ============ INITIALIZATION ============
 document.addEventListener('DOMContentLoaded', () => {
-  player = new VideoPlayerController();
-  chat = new ChatController();
-  voiceChat = new VoiceChatController();
+  window.player = new VideoPlayerController();
+  window.chat = new ChatController();
+  window.voiceChat = new VoiceChatController();
 
   // Populate avatar pickers with bespoke SVG insignia
   document.querySelectorAll('.avatar-btn').forEach(btn => {
@@ -277,6 +277,14 @@ function connectToRoom(roomId, userName, avatar) {
   window.socket.on('sync-heartbeat', (data) => {
     if (!window.isHost) {
       player.handleSyncHeartbeat(data);
+    }
+  });
+
+  // Partner synchronized subtitles
+  window.socket.on('subtitles-updated', (path) => {
+    if (path && window.player) {
+      window.player.loadSubtitles(path);
+      window.player.showNotification('Subtitles synchronized by partner');
     }
   });
 
@@ -599,20 +607,28 @@ async function handleSubtitleUpload(input) {
   const file = input.files[0];
   if (!file) return;
 
-  const formData = new FormData();
-  formData.append('media', file);
+  // 1. Immediately load locally for instant zero-latency rendering
+  if (window.player) {
+    window.player.loadLocalSubtitleFile(file);
+  }
 
-  try {
-    const res = await fetch(`/api/room/${window.currentRoom}/subtitles`, {
-      method: 'POST',
-      body: formData
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast('Subtitles uploaded', 'success');
+  // 2. If inside a networked room, synchronize with partner
+  if (window.currentRoom && window.currentRoom !== 'offline') {
+    const formData = new FormData();
+    formData.append('media', file);
+
+    try {
+      const res = await fetch(`/api/room/${window.currentRoom}/subtitles`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Subtitles synchronized to room', 'success');
+      }
+    } catch (_err) {
+      // Local subtitles already active; network error is non-fatal
     }
-  } catch (err) {
-    showToast('Subtitle upload failed', 'error');
   }
   input.value = '';
 }

@@ -186,6 +186,18 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     assert.ok(data.answer || data.error);
   });
 
+  await t.test('9. Subtitle synchronization event broadcasts across room members', async () => {
+    const subtitlePromise = new Promise((resolve) => {
+      clientViewer.once('subtitles-updated', (path) => {
+        assert.ok(path.includes('test-sub.vtt'));
+        resolve();
+      });
+    });
+
+    io.to('test-recon').emit('subtitles-updated', '/api/stream/test-recon/test-sub.vtt');
+    await subtitlePromise;
+  });
+
   // Clean teardown
   clientHost.disconnect();
   clientViewer.disconnect();
