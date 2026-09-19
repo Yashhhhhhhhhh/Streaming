@@ -1,7 +1,9 @@
-const { spawn, execSync } = require('child_process');
+const { spawn, execSync, exec } = require('child_process');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+
+const statusFilePath = path.join(__dirname, 'public', 'tunnel-status.json');
 
 // Locate cloudflared executable
 function getCloudflaredPath() {
@@ -77,6 +79,25 @@ waitForLocalServer(() => {
   let tunnelUrl = null;
   let urlExtracted = false;
 
+  function syncBeacon(url, active) {
+    try {
+      const data = {
+        url: url || '',
+        active: !!active,
+        updatedAt: new Date().toISOString()
+      };
+      fs.writeFileSync(statusFilePath, JSON.stringify(data, null, 2));
+
+      const msg = active ? 'chore: live stream beacon active' : 'chore: live stream beacon dormant';
+      const cmd = `git add public/tunnel-status.json && git commit -m "${msg}" && git push origin main`;
+      exec(cmd, { cwd: __dirname }, (err) => {
+        if (!err && active) {
+          console.log('   [+] Permanent Bookmark updated on GitHub Pages!');
+        }
+      });
+    } catch (e) {}
+  }
+
   const handleTunnelOutput = (data) => {
     const output = data.toString();
 
@@ -86,31 +107,35 @@ waitForLocalServer(() => {
       urlExtracted = true;
       tunnelUrl = match[0];
 
+      // Sync to GitHub Pages permanent bookmark
+      syncBeacon(tunnelUrl, true);
+
       // Copy to clipboard on Windows
       try {
-        execSync(`powershell -Command "Set-Clipboard -Value '${tunnelUrl}'"`);
+        execSync(`powershell -Command "Set-Clipboard -Value '${tunnelUrl}/?room=cinema'"`);
       } catch (err) {
         // Ignore clipboard errors
       }
 
       console.log('============================================================');
-      console.log('[READY] YOUR WATCH PARTY IS READY TO STREAM');
+      console.log('[READY] YOUR PRIVATE CINEMA IS READY TO STREAM');
       console.log('============================================================');
       console.log(`\n[HOST] FOR YOU (This Laptop):`);
-      console.log(`   -> http://localhost:3000`);
-      console.log(`\n[GUEST] FOR YOUR PARTNER (Remote / Anywhere):`);
-      console.log(`   -> ${tunnelUrl}`);
-      console.log(`\n[CLIPBOARD] Remote link has been automatically copied!`);
-      console.log('\n[OPTIMAL USAGE]');
-      console.log('   * Upload movies directly on your laptop (0s local transfer, up to 10GB+)');
-      console.log('   * Or use "Dual-Local File Sync" if both of you have the file for zero-bandwidth 4K');
-      console.log('   * WebRTC voice chat works over HTTPS automatically');
+      console.log(`   -> http://localhost:3000/?room=cinema`);
+      console.log(`\n[GUEST] FOR YOUR PARTNER (Permanent Bookmark - Never Changes):`);
+      console.log(`   -> https://yashhhhhhhhhh.github.io/Streaming/`);
+      console.log(`\n   (She bookmarks this exact link once. She never needs another link!)`);
+      console.log(`   [Direct Session Link]: ${tunnelUrl}/?room=cinema`);
+      console.log('\n[ZERO-FRICTION STREAMING]');
+      console.log('   * Both of you are automatically inside the private Cinema room');
+      console.log('   * Zero room codes to share, zero codes to type');
+      console.log('   * Simply drag & drop any video/movie file into the player to start');
       console.log('\nPress Ctrl+C at any time to stop the server and tunnel cleanly.\n');
 
       // Auto-open browser for the host
       try {
         const startCmd = process.platform === 'win32' ? 'start' : 'open';
-        execSync(`${startCmd} http://localhost:3000`);
+        execSync(`${startCmd} http://localhost:3000/?room=cinema`);
       } catch (err) {
         // Ignore auto-open error
       }
@@ -126,7 +151,16 @@ waitForLocalServer(() => {
   });
 
   function shutdown() {
-    console.log('\n[*] Shutting down server and tunnel cleanly...');
+    console.log('\n[*] Marking stream dormant and shutting down cleanly...');
+    try {
+      fs.writeFileSync(statusFilePath, JSON.stringify({
+        url: '',
+        active: false,
+        updatedAt: new Date().toISOString()
+      }, null, 2));
+      execSync('git add public/tunnel-status.json && git commit -m "chore: live stream beacon dormant" && git push origin main', { cwd: __dirname, stdio: 'ignore' });
+    } catch (e) {}
+
     try {
       if (process.platform === 'win32' && tunnelProcess.pid) {
         execSync(`taskkill /pid ${tunnelProcess.pid} /T /F`, { stdio: 'ignore' });

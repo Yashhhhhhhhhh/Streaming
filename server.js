@@ -54,9 +54,9 @@ app.use(express.json());
 // ============ ROOM MANAGEMENT ============
 const rooms = new Map();
 
-function createRoom(hostName) {
-  const roomId = uuidv4().substring(0, 8);
-  rooms.set(roomId, {
+function createRoom(hostName, customId = null) {
+  const roomId = customId ? customId.toLowerCase().trim() : uuidv4().substring(0, 8);
+  const room = {
     id: roomId,
     host: null,
     hostName: hostName || 'Host',
@@ -69,23 +69,36 @@ function createRoom(hostName) {
     createdAt: Date.now(),
     chat: [],
     subtitles: null
-  });
+  };
+  rooms.set(roomId, room);
   return roomId;
 }
+
+function getOrCreateRoom(roomId, hostName = 'Host') {
+  const id = (roomId || 'cinema').toLowerCase().trim();
+  let room = rooms.get(id);
+  if (!room) {
+    createRoom(hostName, id);
+    room = rooms.get(id);
+  }
+  return room;
+}
+
+// Pre-initialize permanent couple cinema room
+getOrCreateRoom('cinema', 'Yash');
 
 // ============ API ROUTES ============
 
 // Create room
 app.post('/api/room/create', (req, res) => {
-  const { hostName } = req.body;
-  const roomId = createRoom(hostName);
+  const { hostName, customRoomId } = req.body;
+  const roomId = createRoom(hostName, customRoomId);
   res.json({ roomId, success: true });
 });
 
 // Get room info
 app.get('/api/room/:roomId', (req, res) => {
-  const room = rooms.get(req.params.roomId);
-  if (!room) return res.status(404).json({ error: 'Room not found' });
+  const room = getOrCreateRoom(req.params.roomId);
   res.json({
     id: room.id,
     hostName: room.hostName,
@@ -99,8 +112,7 @@ app.get('/api/room/:roomId', (req, res) => {
 // Upload media
 app.post('/api/room/:roomId/upload', upload.single('media'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const room = rooms.get(req.params.roomId);
-  if (!room) return res.status(404).json({ error: 'Room not found' });
+  const room = getOrCreateRoom(req.params.roomId);
 
   const mediaItem = {
     id: uuidv4().substring(0, 8),
@@ -120,8 +132,7 @@ app.post('/api/room/:roomId/upload', upload.single('media'), (req, res) => {
 // Upload subtitles
 app.post('/api/room/:roomId/subtitles', upload.single('media'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-  const room = rooms.get(req.params.roomId);
-  if (!room) return res.status(404).json({ error: 'Room not found' });
+  const room = getOrCreateRoom(req.params.roomId);
 
   const subtitlePath = `/api/stream/${req.params.roomId}/${req.file.filename}`;
   room.subtitles = subtitlePath;
@@ -253,8 +264,7 @@ app.get('/api/stream/:roomId/:filename', (req, res) => {
 
 // Remove from playlist
 app.delete('/api/room/:roomId/playlist/:mediaId', (req, res) => {
-  const room = rooms.get(req.params.roomId);
-  if (!room) return res.status(404).json({ error: 'Room not found' });
+  const room = getOrCreateRoom(req.params.roomId);
   room.playlist = room.playlist.filter(m => m.id !== req.params.mediaId);
   io.to(req.params.roomId).emit('playlist-updated', room.playlist);
   res.json({ success: true });
@@ -266,11 +276,7 @@ io.on('connection', (socket) => {
 
   // Join room
   socket.on('join-room', ({ roomId, userName, avatar }) => {
-    const room = rooms.get(roomId);
-    if (!room) {
-      socket.emit('error', { message: 'Room not found' });
-      return;
-    }
+    const room = getOrCreateRoom(roomId, userName);
 
     socket.join(roomId);
     socket.roomId = roomId;

@@ -58,16 +58,24 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('join-name').value = savedName;
   }
 
-  // Check URL for room code
+  // ============ PERMANENT COUPLE CINEMA AUTO-CONNECT ============
   const urlParams = new URLSearchParams(window.location.search);
-  const roomCode = urlParams.get('room');
-  if (roomCode) {
-    document.getElementById('join-code').value = roomCode;
-    showJoinModal();
-  }
+  const requestedRoom = (urlParams.get('room') || 'cinema').toLowerCase().trim();
+  const savedAvatar = localStorage.getItem('syncwatch-avatar') || 'scout';
+  const manualLeave = sessionStorage.getItem('syncwatch-manual-leave');
 
   // Drag and drop
   initDragDrop();
+
+  if (savedName && !manualLeave) {
+    // Both user & partner are auto-connected into the cinema room with 0 clicks!
+    connectToRoom(requestedRoom, savedName, savedAvatar);
+  } else if (!savedName) {
+    // First-time visitor (e.g. your girlfriend opening the bookmark on her laptop):
+    // Prompt her once for callsign so she can pick her name and insignia
+    document.getElementById('join-code').value = requestedRoom;
+    showJoinModal();
+  }
 });
 
 // ============ MODAL MANAGEMENT ============
@@ -78,9 +86,11 @@ function showCreateModal() {
 
 function showJoinModal() {
   const modal = document.getElementById('join-modal');
-  const code = document.getElementById('join-code').value.trim();
+  const code = (document.getElementById('join-code').value || 'cinema').trim();
   const title = document.getElementById('join-modal-title');
-  if (code && title) {
+  if (code.toLowerCase() === 'cinema' && title) {
+    title.textContent = 'Enter Private Cinema';
+  } else if (code && title) {
     title.textContent = `Join Watch Party (${code.toUpperCase()})`;
   } else if (title) {
     title.textContent = 'Join a Room';
@@ -151,6 +161,10 @@ async function joinRoom() {
 }
 
 function connectToRoom(roomId, userName, avatar) {
+  sessionStorage.removeItem('syncwatch-manual-leave');
+  if (userName) localStorage.setItem('syncwatch-name', userName);
+  if (avatar) localStorage.setItem('syncwatch-avatar', avatar);
+
   window.currentUser = { name: userName, avatar };
   window.currentRoom = roomId;
 
@@ -323,6 +337,7 @@ function connectToRoom(roomId, userName, avatar) {
 }
 
 function leaveRoom() {
+  sessionStorage.setItem('syncwatch-manual-leave', 'true');
   if (window.socket) {
     window.socket.disconnect();
     window.socket = null;
@@ -331,7 +346,7 @@ function leaveRoom() {
   stopPingMeasurement();
   window.history.replaceState({}, '', '/');
   showPage('landing-page');
-  showToast('Left the room', 'info');
+  showToast('Returned to Outpost Hub', 'info');
 }
 
 // ============ PING & LATENCY MEASUREMENT ============

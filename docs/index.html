@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncWatch — Private Cinema Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a110c;
+      --bg-secondary: #111a13;
+      --bg-card: rgba(17, 26, 19, 0.85);
+      --accent-brass: #c5a059;
+      --accent-brass-glow: rgba(197, 160, 89, 0.35);
+      --accent-green: #22c55e;
+      --text-primary: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border-color: rgba(197, 160, 89, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image: 
+        radial-gradient(circle at 50% 20%, rgba(30, 43, 88, 0.25) 0%, transparent 60%),
+        radial-gradient(circle at 50% 80%, rgba(20, 32, 23, 0.6) 0%, transparent 60%);
+      padding: 1.5rem;
+      overflow-x: hidden;
+    }
+
+    .gateway-card {
+      width: 100%;
+      max-width: 500px;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1.5px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px var(--accent-brass-glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .gateway-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-brass), transparent);
+    }
+
+    .crest-icon {
+      width: 72px;
+      height: 80px;
+      margin: 0 auto 1.5rem;
+      filter: drop-shadow(0 4px 16px var(--accent-brass-glow));
+      animation: floatCrest 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes floatCrest {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-6px); }
+    }
+
+    h1 {
+      font-family: 'Cinzel', serif;
+      font-size: 1.85rem;
+      letter-spacing: 3px;
+      color: #ffffff;
+      margin-bottom: 0.4rem;
+    }
+
+    .subtitle {
+      font-size: 0.88rem;
+      color: var(--accent-brass);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 2rem;
+    }
+
+    /* Radar Scanning Indicator */
+    .radar-container {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      margin: 0 auto 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .radar-circle {
+      position: absolute;
+      border-radius: 50%;
+      border: 1.5px solid var(--accent-brass);
+      opacity: 0;
+      animation: radarPulse 2.8s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+    }
+
+    .radar-circle:nth-child(1) { width: 100%; height: 100%; animation-delay: 0s; }
+    .radar-circle:nth-child(2) { width: 100%; height: 100%; animation-delay: 0.9s; }
+    .radar-circle:nth-child(3) { width: 100%; height: 100%; animation-delay: 1.8s; }
+
+    .radar-core {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(197, 160, 89, 0.15);
+      border: 1.5px solid var(--accent-brass);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      box-shadow: 0 0 15px var(--accent-brass-glow);
+    }
+
+    .radar-core.online {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: var(--accent-green);
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
+    }
+
+    @keyframes radarPulse {
+      0% {
+        transform: scale(0.35);
+        opacity: 0.9;
+      }
+      100% {
+        transform: scale(1.3);
+        opacity: 0;
+      }
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 1rem;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      background: rgba(234, 88, 12, 0.15);
+      border: 1px solid rgba(234, 88, 12, 0.4);
+      color: #ea580c;
+    }
+
+    .status-badge.online {
+      background: rgba(34, 197, 94, 0.15);
+      border-color: rgba(34, 197, 94, 0.4);
+      color: #4ade80;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .status-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 2rem;
+      min-height: 44px;
+    }
+
+    .direct-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.9rem 1.4rem;
+      background: linear-gradient(135deg, #c5a059 0%, #9a7836 100%);
+      color: #0a110c;
+      font-weight: 700;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .direct-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(197, 160, 89, 0.45);
+    }
+
+    .direct-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .footer-note {
+      margin-top: 1.8rem;
+      font-size: 0.75rem;
+      color: rgba(148, 163, 184, 0.7);
+    }
+  </style>
+</head>
+<body>
+  <div class="gateway-card">
+    <!-- Survey Corps Crest SVG -->
+    <svg class="crest-icon" viewBox="0 0 48 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M24 2L4 8V24C4 36.5 12.5 47.8 24 51C35.5 47.8 44 36.5 44 24V8L24 2Z" fill="#101c14" stroke="#c5a059" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M24 6L8 11V24C8 34.2 14.8 43.6 24 46.5C33.2 43.6 40 34.2 40 24V11L24 6Z" fill="#17281d" opacity="0.6"/>
+      <path d="M22 13C16 14 12 18 10 24C12 23 15 22 18 22C14 25 12 29 11 34C13 32 16 31 19 31C16 35 15 39 16 42C18 39 21 36 24 33V13H22Z" fill="#f1f5f9"/>
+      <path d="M26 13C32 14 36 18 38 24C36 23 33 22 30 22C34 25 36 29 37 34C35 32 32 31 29 31C32 35 33 39 32 42C30 39 27 36 24 33V13H26Z" fill="#1e2b58"/>
+      <line x1="24" y1="9" x2="24" y2="44" stroke="#c5a059" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+
+    <h1>SYNCWATCH</h1>
+    <div class="subtitle">Private Cinema Gateway</div>
+
+    <div class="radar-container">
+      <div class="radar-circle"></div>
+      <div class="radar-circle"></div>
+      <div class="radar-circle"></div>
+      <div class="radar-core" id="radar-core">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+      </div>
+    </div>
+
+    <div class="status-badge" id="status-badge">
+      <span class="status-dot"></span>
+      <span id="status-label">Scanning Outpost</span>
+    </div>
+
+    <p class="status-desc" id="status-desc">
+      Searching for active transmission from Yash's laptop...
+    </p>
+
+    <button class="direct-btn" id="direct-btn" disabled onclick="redirectToStream()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      <span>Connect to Cinema</span>
+    </button>
+
+    <div class="footer-note">
+      Bookmark this exact link. You will never need a new link again.
+    </div>
+  </div>
+
+  <script>
+    const REPO_OWNER = 'Yashhhhhhhhhh';
+    const REPO_NAME = 'Streaming';
+    const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/public/tunnel-status.json`;
+    const RAW_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/public/tunnel-status.json`;
+
+    let activeStreamUrl = null;
+    let pollTimer = null;
+    let isRedirecting = false;
+
+    async function checkOutpostStatus() {
+      if (isRedirecting) return;
+
+      try {
+        let statusData = null;
+
+        // Try GitHub API first (zero CDN caching)
+        try {
+          const res = await fetch(API_URL + '?t=' + Date.now());
+          if (res.ok) {
+            const fileJson = await res.json();
+            const decoded = atob(fileJson.content.replace(/\s/g, ''));
+            statusData = JSON.parse(decoded);
+          }
+        } catch (e) {
+          // Fallback to raw URL
+        }
+
+        // Fallback to raw if API failed or rate-limited
+        if (!statusData) {
+          const rawRes = await fetch(RAW_URL + '?t=' + Date.now());
+          if (rawRes.ok) {
+            statusData = await rawRes.json();
+          }
+        }
+
+        if (statusData && statusData.active && statusData.url) {
+          handleStreamOnline(statusData.url);
+        } else {
+          handleStreamOffline();
+        }
+      } catch (err) {
+        handleStreamOffline();
+      }
+    }
+
+    function handleStreamOnline(url) {
+      activeStreamUrl = url.replace(/\/$/, '');
+      const badge = document.getElementById('status-badge');
+      const label = document.getElementById('status-label');
+      const desc = document.getElementById('status-desc');
+      const core = document.getElementById('radar-core');
+      const btn = document.getElementById('direct-btn');
+
+      badge.className = 'status-badge online';
+      label.textContent = 'Outpost Online';
+      core.className = 'radar-core online';
+      desc.textContent = 'Yash\'s cinema is active! Teleporting to your private theater...';
+      btn.disabled = false;
+
+      // Automatically forward into the cinema room after 1.2 seconds
+      isRedirecting = true;
+      setTimeout(() => {
+        redirectToStream();
+      }, 1200);
+    }
+
+    function handleStreamOffline() {
+      const badge = document.getElementById('status-badge');
+      const label = document.getElementById('status-label');
+      const desc = document.getElementById('status-desc');
+      const core = document.getElementById('radar-core');
+      const btn = document.getElementById('direct-btn');
+
+      badge.className = 'status-badge';
+      label.textContent = 'Outpost Dormant';
+      core.className = 'radar-core';
+      desc.textContent = 'Yash\'s laptop is currently offline. Stand by — auto-checking for signal every 4 seconds...';
+      btn.disabled = true;
+
+      // Recheck every 4 seconds
+      clearTimeout(pollTimer);
+      pollTimer = setTimeout(checkOutpostStatus, 4000);
+    }
+
+    function redirectToStream() {
+      if (activeStreamUrl) {
+        window.location.replace(`${activeStreamUrl}/?room=cinema`);
+      }
+    }
+
+    // Initialize check on page load
+    checkOutpostStatus();
+  </script>
+</body>
+</html>

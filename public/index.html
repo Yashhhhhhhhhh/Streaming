@@ -40,20 +40,20 @@
       </div>
 
       <div class="action-cards">
-        <div class="action-card create-card" onclick="showCreateModal()">
-          <div class="card-icon-wrapper">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <div class="action-card create-card" onclick="connectToRoom('cinema', localStorage.getItem('syncwatch-name') || 'Yash', localStorage.getItem('syncwatch-avatar') || 'scout')" style="border-color: var(--accent-brass); background: rgba(197, 160, 89, 0.08);">
+          <div class="card-icon-wrapper" style="background: rgba(197, 160, 89, 0.2); color: var(--accent-brass);">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </div>
-          <h3>Initialize Room</h3>
-          <p>Create an encrypted watch outpost and invite your partner</p>
+          <h3 style="color: var(--accent-brass);">Enter Cinema (Instant)</h3>
+          <p>Jump directly into your permanent private couple cinema</p>
           <div class="card-glow"></div>
         </div>
         <div class="action-card join-card" onclick="showJoinModal()">
           <div class="card-icon-wrapper">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="10"/><path d="M16 12l-4-4v3H8v2h4v3l4-4z"/></svg>
           </div>
-          <h3>Join Session</h3>
-          <p>Enter room coordinates to sync with your partner's stream</p>
+          <h3>Custom Outpost</h3>
+          <p>Join or initialize with specific coordinates</p>
           <div class="card-glow"></div>
         </div>
       </div>
