@@ -57,7 +57,15 @@ function showCreateModal() {
 }
 
 function showJoinModal() {
-  document.getElementById('join-modal').classList.add('active');
+  const modal = document.getElementById('join-modal');
+  const code = document.getElementById('join-code').value.trim();
+  const title = document.getElementById('join-modal-title');
+  if (code && title) {
+    title.textContent = `Join Watch Party (${code.toUpperCase()})`;
+  } else if (title) {
+    title.textContent = 'Join a Room';
+  }
+  modal.classList.add('active');
   document.getElementById('join-name').focus();
 }
 

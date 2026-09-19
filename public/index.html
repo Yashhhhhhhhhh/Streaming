@@ -82,7 +82,7 @@
       <h2>Create Your Room</h2>
       <div class="form-group">
         <label for="create-name">Your Name</label>
-        <input type="text" id="create-name" placeholder="Enter your name..." maxlength="20" autocomplete="off">
+        <input type="text" id="create-name" placeholder="Enter your name..." maxlength="20" autocomplete="off" onkeydown="if(event.key==='Enter') createRoom()">
       </div>
       <div class="form-group">
         <label>Choose Your Avatar</label>
@@ -110,14 +110,14 @@
   <div id="join-modal" class="modal-overlay" onclick="closeModal(this)">
     <div class="modal-content" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeModal(this.closest('.modal-overlay'))">&times;</button>
-      <h2>Join a Room</h2>
+      <h2 id="join-modal-title">Join a Room</h2>
       <div class="form-group">
         <label for="join-name">Your Name</label>
-        <input type="text" id="join-name" placeholder="Enter your name..." maxlength="20" autocomplete="off">
+        <input type="text" id="join-name" placeholder="Enter your name..." maxlength="20" autocomplete="off" onkeydown="if(event.key==='Enter') joinRoom()">
       </div>
-      <div class="form-group">
+      <div class="form-group" id="join-code-group">
         <label for="join-code">Room Code</label>
-        <input type="text" id="join-code" placeholder="Enter room code..." maxlength="8" autocomplete="off" style="text-transform: lowercase; letter-spacing: 3px; text-align: center; font-size: 1.3rem;">
+        <input type="text" id="join-code" placeholder="Enter room code..." maxlength="8" autocomplete="off" style="text-transform: lowercase; letter-spacing: 3px; text-align: center; font-size: 1.3rem;" onkeydown="if(event.key==='Enter') joinRoom()">
       </div>
       <div class="form-group">
         <label>Choose Your Avatar</label>
