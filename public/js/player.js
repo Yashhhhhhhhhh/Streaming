@@ -195,7 +195,7 @@ class VideoPlayerController {
       const err = this.video.error;
       let msg = 'Error decoding video format';
       if (err?.code === 4) {
-        msg = 'Video codec not natively supported by browser. Try converting to MP4/H.264 or use Dual-Local mode.';
+        msg = 'Video codec/container not natively supported by your browser. Use "Host Stream (Upload)" for universal GPU transcoding.';
       }
       this.showNotification(msg, 'error');
     });

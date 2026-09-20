@@ -1,8 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
 const { io: Client } = require('socket.io-client');
 const { server, io } = require('../server.js');
+const { probeMedia, prepareUniversalMedia, checkFfmpeg } = require('../lib/transcoder.js');
 
 test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
   let testPort;
@@ -336,6 +340,78 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     clientViewer.emit('leave-room');
     await hostSawLeavePromise;
   });
+
+  const testTmpDir = path.join(__dirname, 'tmp-media');
+  const testUploadDir = path.join(__dirname, '..', 'uploads', 'test-multi');
+  const sampleMkv = path.join(testTmpDir, 'sample-test.mkv');
+
+  await t.test('16. Universal Transcoder: probeMedia extracts codecs, pixel format, and tracks', async () => {
+    fs.mkdirSync(testTmpDir, { recursive: true });
+    const resGen = spawnSync('ffmpeg', [
+      '-y',
+      '-f', 'lavfi', '-i', 'testsrc=duration=1:size=320x240:rate=24',
+      '-f', 'lavfi', '-i', 'sine=frequency=1000:duration=1',
+      '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'ac3',
+      sampleMkv
+    ], { stdio: 'ignore' });
+
+    assert.equal(resGen.status, 0, 'ffmpeg generated test MKV sample');
+
+    const probe = await probeMedia(sampleMkv);
+    assert.equal(probe.video?.codec, 'h264');
+    assert.equal(probe.audio?.codec, 'ac3');
+    assert.equal(probe.isWebNative, false, 'MKV container with AC3 is flagged as non-web-native');
+    assert.equal(probe.canCopyVideo, true, 'H.264 video can be copied via ultra-fast remux');
+  });
+
+  await t.test('17. Universal Transcoder: prepareUniversalMedia produces web-compatible .web.mp4', async () => {
+    const result = await prepareUniversalMedia(sampleMkv, testTmpDir);
+    assert.equal(result.isOptimized, true);
+    assert.ok(fs.existsSync(result.outputPath), 'Optimized web.mp4 file exists on disk');
+    assert.ok(fs.statSync(result.outputPath).size > 0, 'Optimized web.mp4 file is non-empty');
+
+    const probeOpt = await probeMedia(result.outputPath);
+    assert.equal(probeOpt.video?.codec, 'h264');
+    assert.equal(probeOpt.audio?.codec, 'aac');
+    assert.equal(probeOpt.isWebNative, true, 'Resulting web.mp4 is 100% web-native');
+  });
+
+  await t.test('18. Multi-Format Streaming: /api/stream/:roomId/:filename transparently serves .web.mp4 with HTTP 206 range support', async () => {
+    fs.mkdirSync(testUploadDir, { recursive: true });
+    const targetMkv = path.join(testUploadDir, 'sample-test.mkv');
+    const targetWebMp4 = path.join(testUploadDir, 'sample-test.web.mp4');
+    fs.copyFileSync(sampleMkv, targetMkv);
+    fs.copyFileSync(path.join(testTmpDir, 'sample-test.web.mp4'), targetWebMp4);
+
+    const streamRes = await fetch(`http://localhost:${testPort}/api/stream/test-multi/sample-test.mkv`, {
+      headers: { Range: 'bytes=0-100' }
+    });
+
+    assert.equal(streamRes.status, 206, 'Returns 206 Partial Content');
+    assert.equal(streamRes.headers.get('content-type'), 'video/mp4', 'Returns video/mp4 Content-Type');
+    assert.ok(streamRes.headers.get('content-range')?.startsWith('bytes 0-100/'), 'Returns valid Content-Range header');
+    const buf = await streamRes.arrayBuffer();
+    assert.equal(buf.byteLength, 101, 'Returned exact requested byte slice');
+  });
+
+  await t.test('19. Multi-Format Streaming: on-the-fly live transcoding fallback via ?live=1', async () => {
+    const liveRes = await fetch(`http://localhost:${testPort}/api/stream/test-multi/sample-test.mkv?live=1`);
+    assert.equal(liveRes.status, 200);
+    assert.equal(liveRes.headers.get('content-type'), 'video/mp4');
+    const reader = liveRes.body.getReader();
+    const { value, done } = await reader.read();
+    assert.ok(!done);
+    assert.ok(value.length > 0, 'Received initial fragmented MP4 stream chunk');
+    await reader.cancel();
+  });
+
+  // Clean up temporary test files
+  try {
+    fs.rmSync(testTmpDir, { recursive: true, force: true });
+    fs.rmSync(testUploadDir, { recursive: true, force: true });
+  } catch (e) {}
 
   // Clean teardown
   if (clientHost) clientHost.close();

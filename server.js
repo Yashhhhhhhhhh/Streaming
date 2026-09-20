@@ -6,6 +6,13 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const mime = require('mime-types');
+const {
+  checkFfmpeg,
+  probeMedia,
+  prepareUniversalMedia,
+  extractEmbeddedSubtitles,
+  streamTranscodeOnTheFly
+} = require('./lib/transcoder');
 
 const app = express();
 const server = http.createServer(app);
@@ -46,7 +53,11 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const mimeType = mime.lookup(file.originalname) || '';
-    const allowedExtensions = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.ts', '.m4v', '.m2ts', '.wmv', '.ogv', '.srt', '.vtt', '.ass', '.ssa', '.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg'];
+    const allowedExtensions = [
+      '.mp4', '.mkv', '.webm', '.avi', '.mov', '.flv', '.ts', '.m4v', '.m2ts', '.mts', '.wmv', '.ogv', '.3gp', '.vob',
+      '.srt', '.vtt', '.ass', '.ssa',
+      '.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg', '.opus', '.wma'
+    ];
     
     if (mimeType.startsWith('video/') || mimeType.startsWith('audio/') || allowedExtensions.includes(ext)) {
       cb(null, true);
@@ -83,6 +94,49 @@ function createRoom(hostName, customId = null) {
   return roomId;
 }
 
+function syncRoomDiskPlaylist(room) {
+  if (!room || !room.id) return;
+  const safeRoomId = path.basename(room.id);
+  const roomDir = path.join(uploadsDir, safeRoomId);
+  if (!fs.existsSync(roomDir)) return;
+
+  try {
+    const files = fs.readdirSync(roomDir);
+    for (const file of files) {
+      if (file.endsWith('.web.mp4') || file.includes('.tmp-') || file.endsWith('.vtt') || file.endsWith('.srt') || file.endsWith('.ass') || file.endsWith('.ssa')) {
+        continue;
+      }
+      const fullPath = path.join(roomDir, file);
+      const stat = fs.statSync(fullPath);
+      if (!stat.isFile()) continue;
+
+      const baseName = path.parse(file).name;
+      const webMp4Name = `${baseName}.web.mp4`;
+      const hasOptimized = fs.existsSync(path.join(roomDir, webMp4Name));
+
+      const existing = room.playlist.find(m => m.rawFilename === file || m.filename === file.replace(/^\d+-/, ''));
+      if (!existing) {
+        const streamFile = hasOptimized ? webMp4Name : file;
+        room.playlist.push({
+          id: uuidv4().substring(0, 8),
+          filename: file.replace(/^\d+-/, ''),
+          rawFilename: file,
+          path: `/api/stream/${safeRoomId}/${streamFile}`,
+          size: stat.size,
+          mimeType: mime.lookup(file) || 'video/mp4',
+          uploadedAt: stat.mtimeMs,
+          isOptimized: hasOptimized
+        });
+      } else if (hasOptimized && !existing.isOptimized) {
+        existing.isOptimized = true;
+        existing.path = `/api/stream/${safeRoomId}/${webMp4Name}`;
+      }
+    }
+  } catch (err) {
+    console.warn('[Playlist] Error reading room directory:', err.message);
+  }
+}
+
 function getOrCreateRoom(roomId, hostName = 'Host') {
   const id = (roomId || 'cinema').toLowerCase().trim();
   let room = rooms.get(id);
@@ -90,6 +144,7 @@ function getOrCreateRoom(roomId, hostName = 'Host') {
     createRoom(hostName, id);
     room = rooms.get(id);
   }
+  syncRoomDiskPlaylist(room);
   return room;
 }
 
@@ -197,22 +252,62 @@ app.get('/api/room/:roomId', (req, res) => {
   });
 });
 
-// Upload media
-app.post('/api/room/:roomId/upload', upload.single('media'), (req, res) => {
+// Upload media with Universal Media Transcoder and Subtitle Extraction
+app.post('/api/room/:roomId/upload', upload.single('media'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
   const room = getOrCreateRoom(req.params.roomId);
+
+  const safeRoomId = path.basename(req.params.roomId);
+  const roomDir = path.join(uploadsDir, safeRoomId);
+  const filePath = path.join(roomDir, req.file.filename);
+
+  // Probe media format and codecs
+  const probe = await probeMedia(filePath);
 
   const mediaItem = {
     id: uuidv4().substring(0, 8),
     filename: req.file.originalname,
-    path: `/api/stream/${req.params.roomId}/${req.file.filename}`,
+    rawFilename: req.file.filename,
+    path: `/api/stream/${safeRoomId}/${req.file.filename}`,
     size: req.file.size,
     mimeType: mime.lookup(req.file.originalname) || 'video/mp4',
-    uploadedAt: Date.now()
+    uploadedAt: Date.now(),
+    isOptimized: probe.isWebNative,
+    probe
   };
 
   room.playlist.push(mediaItem);
   io.to(req.params.roomId).emit('playlist-updated', room.playlist);
+
+  // Auto-extract embedded subtitles if present in file (e.g. MKV)
+  if (probe.subtitles && probe.subtitles.length > 0) {
+    const baseName = path.parse(req.file.filename).name;
+    const vttName = `${baseName}.vtt`;
+    const vttPath = path.join(roomDir, vttName);
+    extractEmbeddedSubtitles(filePath, vttPath).then((extracted) => {
+      if (extracted) {
+        const subPath = `/api/stream/${safeRoomId}/${vttName}`;
+        room.subtitles = subPath;
+        io.to(req.params.roomId).emit('subtitles-updated', subPath);
+      }
+    }).catch(console.warn);
+  }
+
+  // If not web-native, trigger universal remux/transcode in background
+  if (!probe.isWebNative) {
+    prepareUniversalMedia(filePath, roomDir).then((result) => {
+      if (result && result.isOptimized && result.filename) {
+        mediaItem.path = `/api/stream/${safeRoomId}/${result.filename}`;
+        mediaItem.isOptimized = true;
+        io.to(req.params.roomId).emit('playlist-updated', room.playlist);
+        if (room.currentMedia && room.currentMedia.id === mediaItem.id) {
+          room.currentMedia.path = mediaItem.path;
+          room.currentMedia.isOptimized = true;
+          io.to(req.params.roomId).emit('media-changed', { media: room.currentMedia });
+        }
+      }
+    }).catch(console.warn);
+  }
 
   res.json({ success: true, media: mediaItem });
 });
@@ -486,16 +581,45 @@ function convertAssToVtt(assContent) {
   return cues.join('\n');
 }
 
-// Stream media with range support for seeking and tunnel chunk optimization
+// Stream media with range support for seeking, transparent universal routing, and on-the-fly live transcoding
 app.get('/api/stream/:roomId/:filename', (req, res) => {
   const safeRoomId = path.basename(req.params.roomId);
   const safeFilename = path.basename(req.params.filename);
-  const filePath = path.join(uploadsDir, safeRoomId, safeFilename);
-  if (!filePath.startsWith(uploadsDir) || !fs.existsSync(filePath)) return res.status(404).send('File not found');
+  const roomDir = path.join(uploadsDir, safeRoomId);
+  let filePath = path.join(roomDir, safeFilename);
+
+  if (!filePath.startsWith(uploadsDir)) return res.status(403).send('Forbidden');
+
+  // Transparent routing to universal web-optimized MP4 if available
+  const baseName = path.parse(safeFilename).name;
+  const webMp4Path = path.join(roomDir, `${baseName}.web.mp4`);
+
+  if (!safeFilename.endsWith('.web.mp4') && fs.existsSync(webMp4Path) && fs.statSync(webMp4Path).size > 0) {
+    filePath = webMp4Path;
+  } else if (!fs.existsSync(filePath) && fs.existsSync(webMp4Path) && fs.statSync(webMp4Path).size > 0) {
+    filePath = webMp4Path;
+  }
+
+  if (!fs.existsSync(filePath)) return res.status(404).send('File not found');
+
+  // On-the-fly live fragmented MP4 stream if requested via ?live=1 or ?transcode=1
+  if (req.query.live === '1' || req.query.transcode === '1') {
+    const startTime = parseFloat(req.query.start || req.query.t || 0) || 0;
+    const handled = streamTranscodeOnTheFly(filePath, startTime, res);
+    if (handled) return;
+  }
+
+  // Trigger background universal transcode if requested file is not yet web-optimized
+  if (!safeFilename.endsWith('.web.mp4') && !fs.existsSync(webMp4Path)) {
+    prepareUniversalMedia(filePath, roomDir).catch(() => {});
+  }
 
   const stat = fs.statSync(filePath);
   const fileSize = stat.size;
-  const mimeType = mime.lookup(filePath) || 'video/mp4';
+  let mimeType = mime.lookup(filePath) || 'video/mp4';
+  if (filePath.endsWith('.web.mp4')) {
+    mimeType = 'video/mp4';
+  }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Range');

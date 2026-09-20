@@ -605,7 +605,10 @@ function updatePlaylistUI(playlist) {
       </div>
       <div class="playlist-item-info">
         <div class="playlist-item-name">${escapeHtml(item.filename)}</div>
-        <div class="playlist-item-size">${formatFileSize(item.size)}</div>
+        <div class="playlist-item-size">
+          ${formatFileSize(item.size)}
+          ${item.isOptimized ? '<span class="playlist-badge-universal">UNIVERSAL</span>' : ''}
+        </div>
       </div>
       <button class="playlist-item-remove" onclick="event.stopPropagation(); removeFromPlaylist('${item.id}')" title="Remove">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -786,7 +789,20 @@ function promptMediaDropAction(file) {
   pendingDroppedFile = file;
   const modal = document.getElementById('drop-action-modal');
   const filenameEl = document.getElementById('drop-modal-filename');
+  const descEl = document.getElementById('drop-modal-desc');
   if (filenameEl) filenameEl.textContent = file.name;
+
+  const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+  const isNonNative = ['.mkv', '.avi', '.wmv', '.flv', '.ts', '.m2ts', '.mts', '.vob', '.3gp', '.m4v'].includes(ext);
+
+  if (descEl) {
+    if (isNonNative) {
+      descEl.textContent = `High-profile format detected (${ext.toUpperCase()}). Choose "Host Stream (Upload)" for universal GPU transcoding across all browsers and devices.`;
+    } else {
+      descEl.textContent = 'Choose playback protocol for this session:';
+    }
+  }
+
   if (modal) {
     modal.classList.add('active');
   } else {

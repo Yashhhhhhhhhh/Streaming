@@ -515,8 +515,8 @@
     </div>
 
     <!-- Hidden file inputs (explicit extensions for complete Windows support) -->
-    <input type="file" id="file-upload-input" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.mov,.flv,.ts,.m4v,.m2ts,.wmv,.ogv" style="display:none" onchange="handleFileUpload(this)">
-    <input type="file" id="local-file-input" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.mov,.flv,.ts,.m4v,.m2ts,.wmv,.ogv" style="display:none" onchange="handleLocalFileSelect(this)">
+    <input type="file" id="file-upload-input" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.mov,.flv,.ts,.m4v,.m2ts,.mts,.wmv,.ogv,.3gp,.vob,.mp3,.m4a,.flac,.wav,.aac,.ogg,.opus,.wma" style="display:none" onchange="handleFileUpload(this)">
+    <input type="file" id="local-file-input" accept="video/*,audio/*,.mp4,.mkv,.webm,.avi,.mov,.flv,.ts,.m4v,.m2ts,.mts,.wmv,.ogv,.3gp,.vob,.mp3,.m4a,.flac,.wav,.aac,.ogg,.opus,.wma" style="display:none" onchange="handleLocalFileSelect(this)">
     <input type="file" id="subtitle-upload-input" accept=".srt,.vtt,.ass,.ssa" style="display:none" onchange="handleSubtitleUpload(this)">
 
     <!-- Upload progress overlay -->
@@ -576,7 +576,7 @@
         <button class="modal-close" onclick="closeDropModal()">&times;</button>
         <h2>Media File Detected</h2>
         <div class="drop-filename-display" id="drop-modal-filename">movie.mp4</div>
-        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem;line-height:1.5;">
+        <p id="drop-modal-desc" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem;line-height:1.5;">
           Choose playback protocol for this session:
         </p>
         <div class="drop-modal-actions">
