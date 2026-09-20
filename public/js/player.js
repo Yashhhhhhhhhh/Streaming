@@ -50,6 +50,15 @@ class VideoPlayerController {
     // Cinema Ambient Glow
     this.initAmbientGlow();
 
+    // Real-time Tactical Telestrator / Laser Pointer
+    this.isLaserActive = false;
+    this.lastLaserEmit = 0;
+    this.telestratorCanvas = null;
+    this.telestratorCtx = null;
+    this.laserDots = [];
+    this.laserAnimLoopRunning = false;
+    this.initTelestrator();
+
     // Heartbeat timer for host
     this.heartbeatTimer = null;
 
@@ -105,6 +114,170 @@ class VideoPlayerController {
       try {
         this.ambientCtx.drawImage(this.video, 0, 0, 16, 9);
       } catch (err) {}
+    }
+  }
+
+  // ---- REAL-TIME TACTICAL TELESTRATOR / LASER POINTER ----
+  initTelestrator() {
+    this.telestratorCanvas = document.getElementById('telestrator-canvas');
+    if (!this.telestratorCanvas) return;
+    this.telestratorCtx = this.telestratorCanvas.getContext('2d');
+
+    const resizeCanvas = () => {
+      if (!this.telestratorCanvas || !this.wrapper) return;
+      const rect = this.wrapper.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      this.telestratorCanvas.width = Math.round(rect.width * dpr);
+      this.telestratorCanvas.height = Math.round(rect.height * dpr);
+      if (this.telestratorCtx) {
+        this.telestratorCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Track mouse over player wrapper
+    this.wrapper.addEventListener('mousemove', (e) => {
+      const isAlt = e.altKey;
+      if (!isAlt && !this.isLaserActive) return;
+
+      const rect = this.wrapper.getBoundingClientRect();
+      const normX = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const normY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+      const color = this.getAccentColor();
+      this.addLaserDot(normX, normY, color);
+
+      const now = Date.now();
+      if (now - this.lastLaserEmit > 30 && window.socket) {
+        this.lastLaserEmit = now;
+        window.socket.emit('laser-pointer', { x: normX, y: normY, isDown: e.buttons === 1 });
+      }
+    });
+  }
+
+  getAccentColor() {
+    const rootStyle = getComputedStyle(document.documentElement);
+    return rootStyle.getPropertyValue('--accent-primary').trim() || '#22c55e';
+  }
+
+  toggleLaserPointer() {
+    this.isLaserActive = !this.isLaserActive;
+    const btn = document.getElementById('laser-btn');
+    if (btn) btn.classList.toggle('active', this.isLaserActive);
+    this.showKeyHint(`Laser: ${this.isLaserActive ? 'ON' : 'OFF'}`);
+  }
+
+  addLaserDot(normX, normY, color) {
+    if (!this.telestratorCanvas || !this.telestratorCtx || !this.wrapper) return;
+    const rect = this.wrapper.getBoundingClientRect();
+    const x = normX * rect.width;
+    const y = normY * rect.height;
+
+    this.laserDots.push({ x, y, color, createdAt: Date.now() });
+
+    if (!this.laserAnimLoopRunning) {
+      this.laserAnimLoopRunning = true;
+      this.runLaserAnimLoop();
+    }
+  }
+
+  receiveRemoteLaser(data) {
+    if (!data || typeof data.x !== 'number' || typeof data.y !== 'number') return;
+    this.addLaserDot(data.x, data.y, '#38bdf8');
+  }
+
+  runLaserAnimLoop() {
+    if (!this.telestratorCanvas || !this.telestratorCtx || !this.wrapper) {
+      this.laserAnimLoopRunning = false;
+      return;
+    }
+
+    const ctx = this.telestratorCtx;
+    const rect = this.wrapper.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    const now = Date.now();
+    this.laserDots = this.laserDots.filter(dot => (now - dot.createdAt) < 650);
+
+    for (const dot of this.laserDots) {
+      const age = (now - dot.createdAt) / 650;
+      const alpha = 1.0 - age;
+
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = dot.color;
+      ctx.fillStyle = dot.color;
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bright inner core
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(dot.x, dot.y, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (this.laserDots.length > 0) {
+      requestAnimationFrame(() => this.runLaserAnimLoop());
+    } else {
+      this.laserAnimLoopRunning = false;
+    }
+  }
+
+  // ---- TACTILE AUDIO FEEDBACK (Web Audio API Synthesizer) ----
+  playTactileFeedback(type = 'reaction') {
+    if (localStorage.getItem('syncwatch-sound-fx') === 'false') return;
+    try {
+      if (!this.audioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) this.audioContext = new AudioCtx();
+      }
+      if (!this.audioContext || this.audioContext.state === 'suspended') {
+        this.audioContext?.resume();
+      }
+      const ctx = this.audioContext;
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      if (type === 'reaction') {
+        // High-tech subtle tactile micro-chirp (880Hz -> 440Hz, 25ms, -24dB)
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.exponentialRampToValueAtTime(440, now + 0.025);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.03);
+      } else if (type === 'join') {
+        // Soft positive dual-tone chime (523Hz -> 659Hz, 120ms, -20dB)
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc1.type = 'triangle';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, now);
+        osc2.frequency.setValueAtTime(659.25, now + 0.06);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.07);
+        osc2.start(now + 0.06);
+        osc2.stop(now + 0.15);
+      }
+    } catch (e) {
+      // Ignore audio policy restrictions
     }
   }
 
@@ -370,6 +543,11 @@ class VideoPlayerController {
         case 'B':
           e.preventDefault();
           this.cycleAudioBoost();
+          break;
+        case 'l':
+        case 'L':
+          e.preventDefault();
+          this.toggleLaserPointer();
           break;
         case 'c':
         case 'C':
@@ -1151,3 +1329,4 @@ function toggleSubtitlesPanel() {
   const sub = document.getElementById('subtitle-upload-input');
   sub?.click();
 }
+function toggleLaserPointer() { window.player?.toggleLaserPointer(); }

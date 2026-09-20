@@ -325,9 +325,17 @@ function connectToRoom(roomId, userName, avatar) {
     chat.showTyping(userName);
   });
 
+  // Real-time Tactical Telestrator / Laser Pointer
+  window.socket.on('laser-pointer', (data) => {
+    if (window.player) {
+      window.player.receiveRemoteLaser(data);
+    }
+  });
+
   // Reactions
   window.socket.on('reaction', ({ emoji, userName }) => {
     player.showFloatingReaction(emoji);
+    window.player?.playTactileFeedback('reaction');
     const label = window.TACTICAL_REACTIONS?.[emoji]?.label || emoji;
     player.showNotification(`${userName}: ${label}`);
   });
@@ -337,6 +345,7 @@ function connectToRoom(roomId, userName, avatar) {
     window.roomMembers = members;
     updateMembersDisplay(members);
     updatePeopleList(members);
+    window.player?.playTactileFeedback('join');
   });
 
   window.socket.on('member-status-changed', ({ member, members }) => {

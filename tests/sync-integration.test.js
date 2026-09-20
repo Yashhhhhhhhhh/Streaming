@@ -141,6 +141,20 @@ test('SyncWatch Real-Time WebSocket & Drift-Sync Suite', async (t) => {
     await reactionPromise;
   });
 
+  await t.test('5b. Real-time Tactical Telestrator / Laser pointer coordinates relay across room members', async () => {
+    const laserPromise = new Promise((resolve) => {
+      clientViewer.once('laser-pointer', (data) => {
+        assert.equal(data.x, 0.42);
+        assert.equal(data.y, 0.68);
+        assert.equal(data.by, 'Levi');
+        resolve();
+      });
+    });
+
+    clientHost.emit('laser-pointer', { x: 0.42, y: 0.68, isDown: true });
+    await laserPromise;
+  });
+
   await t.test('6. Permanent couple room sanctuary (cinema room) exists and persists', async () => {
     const cinemaClient = Client(`http://localhost:${testPort}`, { transports: ['websocket'] });
     await new Promise((resolve) => cinemaClient.connected ? resolve() : cinemaClient.once('connect', resolve));

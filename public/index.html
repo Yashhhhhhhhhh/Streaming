@@ -257,6 +257,9 @@
             <!-- Video element -->
             <video id="video-player" crossorigin="anonymous" preload="auto" playsinline></video>
 
+            <!-- Real-Time Tactical Telestrator / Laser Pointer Canvas -->
+            <canvas class="telestrator-canvas" id="telestrator-canvas"></canvas>
+
             <!-- Custom controls overlay -->
             <div class="controls-overlay" id="controls-overlay">
               <!-- Center play button -->
@@ -351,6 +354,14 @@
                         </div>
                       </div>
                     </div>
+
+                    <!-- Tactical Laser Pointer (Press Alt or Click) -->
+                    <button class="ctrl-btn laser-btn" id="laser-btn" onclick="toggleLaserPointer()" title="Tactical Laser Pointer: Highlight scenes in real-time (Hold Alt or Press L)">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                        <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+                      </svg>
+                    </button>
 
                     <!-- Picture in Picture -->
                     <button class="ctrl-btn" onclick="togglePiP()" title="Picture-in-Picture (Press P)">

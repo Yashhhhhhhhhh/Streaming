@@ -131,7 +131,23 @@ class ChatController {
     text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
     // Links (strict URL pattern without quotes or brackets)
     text = text.replace(/(https?:\/\/[^\s"'<>]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--accent-primary)">$1</a>');
+    // Clickable synchronized timestamps: e.g. [01:23], 12:34, 1:23:45
+    text = text.replace(/(?:\[)?\b((?:\d{1,2}:)?\d{1,2}:\d{2})\b(?:\])?/g, (match, timeStr) => {
+      const seconds = this.parseTimestampToSeconds(timeStr);
+      if (isNaN(seconds)) return match;
+      return `<button class="chat-timestamp-chip" onclick="seekToTimestamp(${seconds})" title="Synchronize playback to ${timeStr}">${timeStr}</button>`;
+    });
     return text;
+  }
+
+  parseTimestampToSeconds(str) {
+    const parts = str.split(':').map(Number);
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return parts[0] * 60 + parts[1];
+    } else if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+    return NaN;
   }
 
   escapeHtml(str) {
@@ -151,5 +167,11 @@ function sendReaction(emoji) {
   if (window.socket) {
     window.socket.emit('reaction', { emoji });
     window.player?.showFloatingReaction(emoji);
+    window.player?.playTactileFeedback('reaction');
+  }
+}
+function seekToTimestamp(seconds) {
+  if (window.player && !isNaN(seconds)) {
+    window.player.seekTo(seconds, true);
   }
 }

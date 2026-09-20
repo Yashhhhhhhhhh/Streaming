@@ -871,6 +871,17 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Real-time Tactical Telestrator / Laser Pointer relay
+  socket.on('laser-pointer', (data) => {
+    if (!socket.roomId) return;
+    socket.to(socket.roomId).emit('laser-pointer', {
+      x: data.x,
+      y: data.y,
+      isDown: !!data.isDown,
+      by: socket.userName
+    });
+  });
+
   // Continuous sync heartbeat (prevents drift over remote networks)
   socket.on('sync-heartbeat', ({ time, isPlaying, rate }) => {
     const room = rooms.get(socket.roomId);

@@ -15,13 +15,15 @@ SyncWatch is an ultra-premium, zero-lag synchronized streaming platform designed
 ```
 server.js          - Express + Socket.IO server; handles room state, 206 partial streaming, hybrid AI router, and permanent cinema room
 watch.js           - Cloudflare tunnel runner; writes tunnel-status.json, manages processes via taskkill on Windows
+lib/
+  transcoder.js    - Universal Media Transcoder: probeMedia, sub-second remuxing, RTX 2050 NVENC GPU offload, subtitle extraction, on-the-fly streaming
 scripts/
   local-llm-server.py     - OpenAI-compatible FastAPI microserver for local Qwen 2.5 3B with 100% RTX 2050 GPU offload
   local-llm-cli.py        - One-shot CLI prompt executor with 0 server overhead
   gpu-diagnostics.py      - Workstation CPU, RAM, and Dual-GPU diagnostic profiler
   download-coding-model.py - HuggingFace model downloader for Qwen2.5-Coder-3B-Instruct GGUF
 tests/
-  sync-integration.test.js - Automated 9-scenario integration suite verifying WebSockets, drift sync, AI router, and subtitles
+  sync-integration.test.js - Automated 21-scenario integration suite verifying WebSockets, drift sync, AI router, subtitles, mobile resilience, and universal streaming
 public/
   index.html       - Single-page application DOM; landing page, modals, video player wrapper, telemetry capsule, sidebar
   css/
@@ -66,7 +68,17 @@ docs/
 - `C`: Sidebar collapse / expand toggle
 - `P`: Picture-in-Picture (PiP)
 - `B`: Audio Booster (100% &rarr; 150% &rarr; 200%)
+- `L` / `Alt`: Tactical Laser Pointer toggle / highlight
 - `[` / `]`: Subtitle delay offset (-0.5s / +0.5s)
+
+---
+
+## [INVARIANTS] Engineering Guardrails
+
+1. **Sub-Second Media Remuxing**: If video stream is 8-bit H.264 (`yuv420p`), NEVER re-encode video. Copy stream (`-c:v copy`), convert audio to AAC, and add `+faststart`. Offload non-H.264 video 100% to NVIDIA RTX 2050 GPU via NVENC (`h264_nvenc`).
+2. **Mobile Session Resilience**: Never delete members or drop host on unexpected disconnects. Maintain a 45s disconnect grace period, track persistent `userId` in `localStorage`, and hook `visibilitychange` & `pageshow` for automated recovery.
+3. **Co-Watching Presence**: Keep chat timestamps clickable for synchronized seeking. Relate normalized canvas coordinates `(0.0 - 1.0)` over WebSockets for resolution-independent laser pointing.
+4. **Ephemeral Test Servers**: Always terminate background test daemons and child processes cleanly upon test completion. Never leave orphan node processes binding ports.
 
 ---
 
@@ -74,6 +86,6 @@ docs/
 
 Always run before finalizing any changes:
 ```bash
-node --check server.js watch.js public/js/*.js
+node --check server.js watch.js lib/transcoder.js public/js/*.js
 ```
 All files must exit with code `0`.
